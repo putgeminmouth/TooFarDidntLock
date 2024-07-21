@@ -159,20 +159,24 @@ class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate, CBPeriphe
     }
     
     func connect(uuid: UUID) -> Void? {
-        guard let peripheral = monitoredPeripherals.first(where: {$0.peripheral.identifier == uuid})
+        guard var device = monitoredPeripherals.first(where: {$0.peripheral.identifier == uuid})
         else { return nil }
         // i don't think this is required but it gives more immediate feedback and avoids logs
-        guard !connections.contains(peripheral.peripheral.identifier)
+        guard !connections.contains(uuid)
         else { return () }
         // could not get CBConnectPeripheralOptionEnableAutoReconnect working
-        centralManager.connect(peripheral.peripheral)
+        device.connectRetriesRemaining = 1
+        monitoredPeripherals.update(with: device)
+        centralManager.connect(device.peripheral)
         return ()
     }
 
     func disconnect(uuid: UUID) {
-        guard let peripheral = monitoredPeripherals.first(where: {$0.peripheral.identifier == uuid})
+        guard var device = monitoredPeripherals.first(where: {$0.peripheral.identifier == uuid})
         else { return }
-        centralManager.cancelPeripheralConnection(peripheral.peripheral)
+        device.connectRetriesRemaining = 0
+        monitoredPeripherals.update(with: device)
+        centralManager.cancelPeripheralConnection(device.peripheral)
     }
     
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
