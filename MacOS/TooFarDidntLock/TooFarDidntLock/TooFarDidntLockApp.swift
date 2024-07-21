@@ -47,8 +47,9 @@ struct TooFarDidntLockApp: App {
     
     var body: some Scene {
         // This window gets hidden, but we need a place to attach handlers
-        Window("", id: "DummyWindowToProcessEvents") {
+        Window("Too Far; Didn't Lock", id: "DummyWindowToProcessEvents") {
             EmptyView()
+                .frame(width: 0, height: 0	)
                 .onReceive(cooldownPeriodTimer) { time in
                     stopCooldownPeriod();
                 }

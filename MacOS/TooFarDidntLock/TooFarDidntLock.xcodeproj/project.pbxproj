@@ -45,6 +45,7 @@
 		037339D62C41F6BE00C1EF0B /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		037339D82C47344700C1EF0B /* SwiftUIGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftUIGlue.swift; sourceTree = "<group>"; };
 		037339DA2C493D1E00C1EF0B /* Util.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Util.swift; sourceTree = "<group>"; };
+		037339DC2C4CBA1C00C1EF0B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		03B947C32C30858900E75D5E /* TooFarDidntLock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TooFarDidntLock.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		03B947C62C30858900E75D5E /* TooFarDidntLockApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooFarDidntLockApp.swift; sourceTree = "<group>"; };
 		03B947CA2C30858B00E75D5E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -96,6 +97,7 @@
 				03B947D72C30858C00E75D5E /* TooFarDidntLockTests */,
 				03B947E12C30858C00E75D5E /* TooFarDidntLockUITests */,
 				03B947C42C30858900E75D5E /* Products */,
+				037339DC2C4CBA1C00C1EF0B /* README.md */,
 			);
 			sourceTree = "<group>";
 		};
