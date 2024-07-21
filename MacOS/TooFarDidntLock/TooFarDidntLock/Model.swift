@@ -9,6 +9,7 @@ struct DeviceLinkModel: Equatable {
     var referencePower: Double
     var maxDistance: Double
     var idleTimeout: TimeInterval?
+    var requireConnection: Bool
 }
 
 struct BluetoothDeviceModel: Equatable {
@@ -18,6 +19,7 @@ struct BluetoothDeviceModel: Equatable {
     var rssi: Double
     var txPower: Double?
     var lastSeenAt: Date
+    var isConnected: Bool
 }
 
 
@@ -27,6 +29,7 @@ struct DeviceLinkStorage: Equatable {
     var referencePower: Double
     var maxDistance: Double
     var idleTimeout: TimeInterval?
+    var requireConnection: Bool
 }
 struct BluetoothDeviceDetailsStorage: Equatable {
     var uuid: String
@@ -93,7 +96,8 @@ extension DeviceLinkStorage: DictionaryRepresentable {
             "deviceDetails": self.deviceDetails.toDict(),
             "referencePower": self.referencePower,
             "maximumDistance": self.maxDistance,
-            "idleTimeout": self.idleTimeout
+            "idleTimeout": self.idleTimeout,
+            "requireConnection": self.requireConnection,
         ]
         return dict
     }
@@ -102,14 +106,16 @@ extension DeviceLinkStorage: DictionaryRepresentable {
               let deviceDetails = dict["deviceDetails"]?.flatMap({$0 as? [String: Any?]}).flatMap(BluetoothDeviceDetailsStorage.fromDict),
               let referencePower = (dict["referencePower"] as? NSNumber)?.doubleValue,
               let maximumDistance = (dict["maximumDistance"] as? NSNumber)?.doubleValue,
-              let idleTimeout = (dict["idleTimeout"] as? NSNumber)?.doubleValue
+              let idleTimeout = (dict["idleTimeout"] as? NSNumber)?.doubleValue,
+              let requireConnection = dict["requireConnection"] as? Bool
         else { return nil }
         return DeviceLinkStorage(
             uuid: uuid,
             deviceDetails: deviceDetails,
             referencePower: referencePower,
             maxDistance: maximumDistance,
-            idleTimeout: idleTimeout
+            idleTimeout: idleTimeout,
+            requireConnection: requireConnection
         )
     }
 }
