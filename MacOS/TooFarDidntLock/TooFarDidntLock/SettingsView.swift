@@ -71,9 +71,9 @@ struct LabeledIntSlider: View {
 
     var body: some View {
         LabeledView(label: label, horizontal: true, description: description) {
-            Text(format(value))
-                .frame(minWidth: 50)
             Slider(value: $value, in: `in`, step: step)
+            Text(format(value))
+                .frame(minWidth: 50, alignment: .trailing)
         }
     }
 }
@@ -83,14 +83,18 @@ struct LabeledDoubleSlider: View {
     let description: String?
     @Binding var value: Double
     let `in`: ClosedRange<Double>
-    let step: Double
+    var step: Double? = nil
     let format: (Double) -> String
 
     var body: some View {
         LabeledView(label: label, horizontal: true, description: description) {
+            if let step = step {
+                Slider(value: $value, in: `in`, step: step)
+            } else {
+                Slider(value: $value, in: `in`)
+            }
             Text(format(value))
-                .frame(minWidth: 50)
-            Slider(value: $value, in: `in`, step: step)
+                .frame(minWidth: 50, alignment: .trailing)
         }
     }
 }
@@ -496,39 +500,33 @@ struct DeviceLinkSettingsView: View {
                                 .border(Color.gray, width: 1)
                                 .cornerRadius(2)
                         }
-                        HStack {
-                            Text("Reference Power")
-                            Slider(value: $linkedDeviceReferencePower, in: -100...0)
-                            .onChange(of: linkedDeviceReferencePower) {
-                                if let _ = deviceLinkModel.value {
-                                    deviceLinkModel.value?.referencePower = linkedDeviceReferencePower
-                                }
+                        LabeledDoubleSlider(
+                            label: "Reference Power",
+                            description: "Set to the signal power at 1 meter.",
+                            value: $linkedDeviceReferencePower, in: -100...0, format: {"\(Int($0))"})
+                        .onChange(of: linkedDeviceReferencePower) {
+                            if let _ = deviceLinkModel.value {
+                                deviceLinkModel.value?.referencePower = linkedDeviceReferencePower
                             }
-                            Text("\(String(format: "%.0f", linkedDeviceReferencePower))")
                         }
-                        HStack {
-                            Text("Max distance")
-                            Slider(value: $linkedDeviceMaxDistance, in: 0.0...9.0, step: 0.25)
-                            .onChange(of: linkedDeviceMaxDistance) {
-                                if let _ = deviceLinkModel.value {
-                                    deviceLinkModel.value?.maxDistance = linkedDeviceMaxDistance
-                                }
+                        LabeledDoubleSlider(
+                            label: "Max distance",
+                            description: "Device is considered absent if moved too far away.",
+                            value: $linkedDeviceMaxDistance, in: 0.0...9.0, step: 0.25, format: {"\(String(format: "%.2f", $0))"})
+                        .onChange(of: linkedDeviceMaxDistance) {
+                            if let _ = deviceLinkModel.value {
+                                deviceLinkModel.value?.maxDistance = linkedDeviceMaxDistance
                             }
-                            Text("\(String(format: "%.2f", linkedDeviceMaxDistance))")
                         }
-                        HStack {
-                            Text("Idle timeout")
-                            Slider(value: $linkedDeviceIdleTimeout, in: 0...10*60, step: 10)
-                            .onChange(of: linkedDeviceIdleTimeout) {
-                                let a = deviceLinkModel
-                                let b = deviceLinkModel.value?.idleTimeout
-                                let c = linkedDeviceIdleTimeout
-                                if let _ = deviceLinkModel.value {
-                                    deviceLinkModel.value?.idleTimeout = linkedDeviceIdleTimeout
-                                    deviceLinkModel = deviceLinkModel
-                                }
+                        LabeledDoubleSlider(
+                            label: "Idle timeout",
+                            description: "Device is considered absent if not found for too long.",
+                            value: $linkedDeviceIdleTimeout, in: 0...10*60, step: 10, format: {formatMinSec(msec: $0)})
+                        .onChange(of: linkedDeviceIdleTimeout) {
+                            if let _ = deviceLinkModel.value {
+                                deviceLinkModel.value?.idleTimeout = linkedDeviceIdleTimeout
+                                deviceLinkModel = deviceLinkModel
                             }
-                            Text("\(formatMinSec(msec: linkedDeviceIdleTimeout))")
                         }
                         Toggle("Require connection", isOn: $linkedDeviceRequireConnection)
                             .onChange(of: linkedDeviceRequireConnection) {
