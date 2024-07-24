@@ -284,6 +284,7 @@ struct TooFarDidntLockApp: App {
             device.name = update.peripheral.name
             device.rssi = update.lastSeenRSSI
             device.lastSeenAt = update.lastSeenAt
+            device.isConnected = update.peripheral.isConnected
             availableDevices[index] = device
         } else {
             let device = BluetoothDeviceModel(

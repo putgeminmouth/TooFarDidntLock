@@ -539,16 +539,21 @@ struct DeviceLinkSettingsView: View {
                                 deviceLinkModel = deviceLinkModel
                             }
                         }
-                        LabeledView(
-                            label: "Require connection",
-                            horizontal: true,
-                            description: "When active, the app will attempt to maintain a bluetooth connection to the device, reconnecting as necessary. If the connection fails, the screen will lock.") {
-                                Toggle("", isOn: $linkedDeviceRequireConnection)
-                                    .onChange(of: linkedDeviceRequireConnection) {
-                                        if let _ = deviceLinkModel.value {
-                                            deviceLinkModel.value?.requireConnection = linkedDeviceRequireConnection
+                        HStack {
+                            LabeledView(
+                                label: "Require connection",
+                                horizontal: true,
+                                description: "When active, the app will attempt to maintain a bluetooth connection to the device, reconnecting as necessary. If the connection fails, the screen will lock.") {
+                                    Toggle("", isOn: $linkedDeviceRequireConnection)
+                                        .onChange(of: linkedDeviceRequireConnection) {
+                                            if let _ = deviceLinkModel.value {
+                                                deviceLinkModel.value?.requireConnection = linkedDeviceRequireConnection
+                                            }
                                         }
-                                    }
+                                }
+                            Spacer()
+                            Image(systemName: (deviceLinkModel.value?.deviceDetails.isConnected ?? false) ? "cable.connector" : "cable.connector.slash")
+                                .colorMultiply(linkedDeviceRequireConnection ? .white : .gray)
                         }
                     }
                     
