@@ -2,12 +2,14 @@ import SwiftUI
 import OSLog
 import Combine
 import CoreBluetooth
+import ServiceManagement
 
 @main
 struct TooFarDidntLockApp: App {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "App")
 
     @AppStorage("app.general.launchAtStartup") var launchAtStartup: Bool = false
+    @AppStorage("app.general.showInDock") var showInDock: Bool = false
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     // TODO: debounce by group
@@ -124,7 +126,7 @@ struct TooFarDidntLockApp: App {
                             }
                             smoothingFunc.state = newValue.deviceDetails.rssi
                             if newValue.requireConnection {
-                                if bluetoothScanner.connect(uuid: newValue.uuid) == nil {
+                                if bluetoothScanner.connect(maintainConnectionTo: newValue.uuid) == nil {
                                     logger.info("deviceLinkModel.change: device not found on connect()")
                                 }
                             }
@@ -153,8 +155,32 @@ struct TooFarDidntLockApp: App {
                         )
                     }
                 }
-                .onReceive(bluetoothScanner) { peripheral in
-                    onBluetoothScannerUpdate(peripheral)
+                .onChange(of: showInDock, initial: true) { (old, new) in
+                    if (new) {
+                        NSApp.setActivationPolicy(.regular)
+                    } else {
+                        NSApp.setActivationPolicy(.accessory)
+                    }
+                }
+                .onChange(of: launchAtStartup) {
+                    if (launchAtStartup) {
+                        do {
+                            try SMAppService.mainApp.register()
+                        } catch {
+                            logger.error("Failed to register service \(error)")
+                        }
+                    } else {
+                        do {
+                            try SMAppService.mainApp.unregister()
+                        } catch {
+                            logger.error("Failed to unregister service \(error)")
+                        }
+                    }
+                }
+                .onReceive(bluetoothDebouncer) { peripherals in
+                    for peripheral in peripherals {
+                        onBluetoothScannerUpdate(peripheral)
+                    }
                 }
                 .onReceive(bluetoothScanner.didDisconnect) { uuid in
                     onBluetoothDidDisconnect(uuid)
@@ -192,13 +218,13 @@ struct TooFarDidntLockApp: App {
                          linkedDeviceRSSIRawSamples: $linkedDeviceRSSIRawSamples,
                          linkedDeviceRSSISmoothedSamples: $linkedDeviceRSSISmoothedSamples,
                          linkedDeviceDistanceSamples: $linkedDeviceDistanceSamples,
-//                         linkedDeviceRSSIRawSamples: $linkedDeviceRSSIRawSamples,
-//                         linkedDeviceRSSISmoothedSamples: $linkedDeviceRSSISmoothedSamples,
-//                         linkedDeviceDistanceSamples: $linkedDeviceDistanceSamples,
+                         launchAtStartup: $launchAtStartup,
+                         showInDock: $showInDock,
                          safetyPeriodSeconds: $safetyPeriodSeconds,
-                         cooldownPeriodSeconds: $cooldownPeriodSeconds)
-            .environmentObject(EnvVar<Bool>($launchAtStartup.wrappedValue))
-//            .environmentObject(EnvVar<Bool>($requireDeviceFound.wrappedValue))
+                         cooldownPeriodSeconds: $cooldownPeriodSeconds
+            )
+//            .environmentObject(EnvBinding<Bool, GeneralSettingsView.LaunchAtStartup>($launchAtStartup))
+//            .environmentObject(EnvBinding<Bool, GeneralSettingsView.ShowInDock>($showInDock))
         }
     }
 
@@ -341,7 +367,7 @@ struct TooFarDidntLockApp: App {
             assert(linkedDeviceDistanceSamples.count == 0 || zip(linkedDeviceDistanceSamples, linkedDeviceDistanceSamples.dropFirst()).allSatisfy { current, next in current.a < next.a })
 
             if device.requireConnection {
-                if bluetoothScanner.connect(uuid: device.uuid) == nil {
+                if bluetoothScanner.connect(maintainConnectionTo: device.uuid) == nil {
                     logger.info("onBluetoothScannerUpdate: device not found on connect()")
                 }
             }
@@ -517,6 +543,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+//        NSApp.setActivationPolicy(.accessory)
     }
 }

@@ -1,6 +1,5 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import ServiceManagement
 import OSLog
 import Charts
 
@@ -118,6 +117,8 @@ struct SettingsView: View {
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceDistanceSamples: [Tuple2<Date, Double>]
+    @Binding var launchAtStartup: Bool
+    @Binding var showInDock: Bool
     @Binding var safetyPeriodSeconds: Int
     @Binding var cooldownPeriodSeconds: Int
 
@@ -133,6 +134,8 @@ struct SettingsView: View {
             ATabView {
                 ATab("General", systemName: "gear") {
                     GeneralSettingsView(
+                        launchAtStartup: $launchAtStartup,
+                        showInDock: $showInDock,
                         safetyPeriodSeconds: $safetyPeriodSeconds,
                         cooldownPeriodSeconds: $cooldownPeriodSeconds)
                 }
@@ -154,28 +157,15 @@ struct SettingsView: View {
 struct GeneralSettingsView: View {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "Settings")
 
-    @EnvironmentObject var launchAtStartup: EnvVar<Bool>
+    @Binding var launchAtStartup: Bool
+    @Binding var showInDock: Bool
     @Binding var safetyPeriodSeconds: Int
     @Binding var cooldownPeriodSeconds: Int
 
     var body: some View {
         VStack(alignment: .leading) {
-            Toggle("Launch at startup", isOn: $launchAtStartup.wrappedValue)
-                .onChange(of: launchAtStartup) {
-                    if (launchAtStartup.wrappedValue) {
-                        do {
-                            try SMAppService.mainApp.register()
-                        } catch {
-                            logger.error("Failed to register service \(error)")
-                        }
-                    } else {
-                        do {
-                            try SMAppService.mainApp.unregister()
-                        } catch {
-                            logger.error("Failed to unregister service \(error)")
-                        }
-                    }
-                }
+            Toggle("Launch at startup", isOn: $launchAtStartup)
+            Toggle("Show in dock", isOn: $showInDock)
             LabeledIntSlider(
                 label: "Safety period",
                 description: "When the app starts up, locking is disabled for a while. This provides a safety window to make sure you can't get permanently locked out.",
@@ -280,11 +270,15 @@ struct AvailableDevicesSettingsView: View {
 }
 
 struct LineChart: View {
+    @State var refreshViewTimer = Timed(interval: 2)
     @Binding var samples: [Tuple2<Date, Double>]
     @State var xRange: Int
     @Binding var yAxisMin: Double
     @Binding var yAxisMax: Double
     var body: some View {
+        // we want to keep the graph moving even if no new data points have come in
+        // this binds the view render to the timer updates
+        let _ = refreshViewTimer
         let now = Date.now
         let xAxisMin = Calendar.current.date(byAdding: .second, value: -(xRange+1), to: now)!
         let xAxisMax = Calendar.current.date(byAdding: .second, value: 0, to: now)!
