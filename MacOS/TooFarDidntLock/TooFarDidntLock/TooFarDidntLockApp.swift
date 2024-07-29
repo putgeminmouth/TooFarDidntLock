@@ -95,6 +95,9 @@ struct TooFarDidntLockApp: App {
                     }
 
                     var shouldLock = false
+                    if peripheral == nil {
+                        shouldLock = true
+                    }
                     if distance ?? 0 > link.maxDistance {
                         shouldLock = true
                     }
@@ -384,6 +387,8 @@ struct TooFarDidntLockApp: App {
 // MenuBarExtra is all wonky and even with a hidden Window()
 // change/receive are not always called.
 class StatusBarDelegate: NSObject, NSMenuDelegate, ObservableObject {
+    let logger = Logger(subsystem: "TooFarDidntLock", category: "App")
+
     private let aboutWindow: AboutWindow
 
     private var aboutBoxWindowController: NSWindowController?
@@ -414,6 +419,7 @@ class StatusBarDelegate: NSObject, NSMenuDelegate, ObservableObject {
     }
     
     func setMenuIcon(_ name: String, tooltip: String? = nil) {
+        logger.debug("setMenuIcon(\(name))")
         statusBarItem.button?.image = NSImage(named: name)
         if let tooltip = tooltip {
             statusBarItem.button?.toolTip = tooltip

@@ -282,13 +282,14 @@ struct LineChart: View {
         let now = Date.now
         let xAxisMin = Calendar.current.date(byAdding: .second, value: -(xRange+1), to: now)!
         let xAxisMax = Calendar.current.date(byAdding: .second, value: 0, to: now)!
-        
-        let average: Double? = (samples.first != nil) && (samples.last != nil) ? (samples.first!.b + samples.last!.b) / 2.0 : nil
+
+        let filteredSamples = samples.filter{$0.a > xAxisMin}
+        let average: Double? = (filteredSamples.first != nil) && (filteredSamples.last != nil) ? (filteredSamples.first!.b + filteredSamples.last!.b) / 2.0 : nil
         let averageSamples: [Tuple2<Date, Double>]? = average != nil ? [Tuple2(xAxisMin, average!), Tuple2(xAxisMax, average!)] : nil
         
         Chart {
-            if samples.count > 2 {
-                ForEach(samples, id: \.a) { sample in
+            if filteredSamples.count > 2 {
+                ForEach(filteredSamples, id: \.a) { sample in
                     LineMark(x: .value("t", sample.a), y: .value("y", sample.b), series: .value("", "samples"))
                     PointMark(x: .value("t", sample.a), y: .value("y", sample.b))
                         .symbolSize(10)
@@ -305,7 +306,7 @@ struct LineChart: View {
                 }
             }
         }.overlay {
-            if samples.count > 2 {
+            if filteredSamples.count > 2 {
                 EmptyView()
             } else {
                 Text("Gathering data...")
