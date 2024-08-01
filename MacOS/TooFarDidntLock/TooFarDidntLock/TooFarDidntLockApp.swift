@@ -9,14 +9,14 @@ struct TooFarDidntLockApp: App {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "App")
 
     @AppStorage("app.general.launchAtStartup") var launchAtStartup: Bool = false
-    @AppStorage("app.general.showInDock") var showInDock: Bool = false
+    @AppStorage("app.general.showInDock") var showInDock: Bool = true
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     // TODO: debounce by group
     @State var deviceLinkModel = OptionalModel<DeviceLinkModel>()
     let bluetoothScanner: BluetoothScanner
     @State var bluetoothDebouncer: Debouncer<MonitoredPeripheral>
-    @Debounced(interval: 2.0) var availableDevices = [BluetoothDeviceModel]()
+    @Debounced(interval: 2.0) var availableDevices = [MonitoredPeripheral]()
 
     @Debounced(interval: 2.0) var linkedDeviceRSSIRawSamples = [Tuple2<Date, Double>]()
     @Debounced(interval: 2.0) var linkedDeviceRSSISmoothedSamples = [Tuple2<Date, Double>]()
@@ -103,7 +103,7 @@ struct TooFarDidntLockApp: App {
                     }
                     
                     if shouldLock {
-                        logger.info("Would lock; distance=\(distance ?? -1) > \(link.maxDistance); disconnected=\(link.requireConnection && !(peripheral?.peripheral.isConnected ?? false))")
+                        logger.info("Would lock; distance=\(distance ?? -1) > \(link.maxDistance); disconnected=\(link.requireConnection && !(peripheral?.connectionState == .connected))")
                         doLock()
                     }
                     
@@ -111,23 +111,12 @@ struct TooFarDidntLockApp: App {
                 .onChange(of: deviceLinkModel, initial: false) { old, new in
 //                    guard old. != new else { return }
                     if let newValue = new.value {
-                        applicationStorage.deviceLink = DeviceLinkStorage(
-                            uuid: newValue.uuid.uuidString,
-                            deviceDetails: BluetoothDeviceDetailsStorage(
-                                uuid: newValue.deviceDetails.uuid.uuidString,
-                                name: newValue.deviceDetails.name,
-                                rssi: newValue.deviceDetails.rssi
-                            ),
-                            referencePower: newValue.referencePower,
-                            maxDistance: newValue.maxDistance,
-                            idleTimeout: newValue.idleTimeout,
-                            requireConnection: newValue.requireConnection
-                        )
+                        applicationStorage.deviceLink = newValue
                         if old.value?.uuid != newValue.uuid || old.value?.requireConnection != newValue.requireConnection {
                             if let oldValue = old.value {
                                 bluetoothScanner.disconnect(uuid: oldValue.uuid)
                             }
-                            smoothingFunc.state = newValue.deviceDetails.rssi
+                            smoothingFunc.state = newValue.deviceState?.lastSeenRSSI ?? 0
                             if newValue.requireConnection {
                                 if bluetoothScanner.connect(maintainConnectionTo: newValue.uuid) == nil {
                                     logger.info("deviceLinkModel.change: device not found on connect()")
@@ -140,17 +129,11 @@ struct TooFarDidntLockApp: App {
                 }
                 .onChange(of: applicationStorage, initial: true) { (old, new) in
                     // logger.debug("applicationStorage changed")
-                    if let link = new.deviceLink,
-                       let uuid = UUID(uuidString: link.uuid) {
+                    if let link = new.deviceLink {
                         deviceLinkModel.value = DeviceLinkModel(
-                            uuid: uuid,
-                            deviceDetails: BluetoothDeviceModel(
-                                uuid: uuid,
-                                name: link.deviceDetails.name,
-                                rssi: link.deviceDetails.rssi,
-                                lastSeenAt: Date.now,
-                                isConnected: self.deviceLinkModel.value?.deviceDetails.isConnected ?? false
-                            ),
+                            uuid: link.uuid,
+                            deviceDetails: link.deviceDetails,
+                            deviceState: link.deviceState,
                             referencePower: link.referencePower,
                             maxDistance: link.maxDistance,
                             idleTimeout: link.idleTimeout,
@@ -308,66 +291,54 @@ struct TooFarDidntLockApp: App {
     }
     
     func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
-        if let index = availableDevices.firstIndex(where: {$0.uuid == update.peripheral.identifier }) {
-            var device = availableDevices[index]
-            device.name = update.peripheral.name
-            device.rssi = update.lastSeenRSSI
-            device.lastSeenAt = update.lastSeenAt
-            device.isConnected = update.peripheral.isConnected
-            availableDevices[index] = device
+        if let index = availableDevices.firstIndex(where: {$0.peripheral.identifier == update.peripheral.identifier }) {
+            availableDevices[index] = update
         } else {
-            let device = BluetoothDeviceModel(
-                uuid: update.peripheral.identifier,
-                name: update.peripheral.name,
-                rssi: update.lastSeenRSSI,
-                txPower: update.txPower,
-                lastSeenAt: update.lastSeenAt,
-                isConnected: update.peripheral.isConnected
-            )
-            availableDevices.append(device)
+            availableDevices.append(update)
         }
+
         availableDevices.sort(by: { (lhs, rhs) in
-            if lhs.uuid == deviceLinkModel.value?.uuid {
+            let lhsId = lhs.peripheral.identifier
+            let lhsName = lhs.peripheral.name
+            let rhsId = rhs.peripheral.identifier
+            let rhsName = rhs.peripheral.name
+            
+            if lhsId == deviceLinkModel.value?.uuid {
                 return true
             }
-            if rhs.uuid == deviceLinkModel.value?.uuid {
+            if rhsId == deviceLinkModel.value?.uuid {
                 return false
             }
-            switch (lhs.name, rhs.name) {
+            switch (lhsName, rhsName) {
             case (nil, nil):
-                return lhs.uuid < rhs.uuid
+                return lhsId < rhsId
             case (nil, _):
                 return false
             case (_, nil):
                 return true
             default:
-                return lhs.name! < rhs.name!
+                return lhsName! < rhsName!
             }
         })
 
-//        for linked in updates.filter({$0.peripheral.identifier == deviceLinkModel.value?.uuid}) {
-//        if let linked = updates.first(where: {$0.peripheral.identifier == deviceLinkModel.value?.uuid}) {
-        if update.peripheral.identifier == deviceLinkModel.value?.uuid {
-            let linked = update
+        if let device = deviceLinkModel.value,
+            update.peripheral.identifier == device.uuid {
             func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
                 return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
             }
             
-            // TODO: are deviceLinkModel and updates necessarily synched at this point? I guess not...
+            deviceLinkModel.value?.deviceState = update
             
-            let device = deviceLinkModel.value!
-            
-//            let linkedDeviceRSSISmoothedSample = (linkedDeviceRSSIRawSamples.lastNSeconds(seconds: 20).map{$0.b}.suffix(1000).average() + linked.lastSeenRSSI) / 2.0
             let linkedDeviceRSSISmoothedSample = smoothingFunc.update(measurement: linkedDeviceRSSIRawSamples.last?.b ?? 0)
 
-            linkedDeviceRSSIRawSamples = tail(linkedDeviceRSSIRawSamples + [Tuple2(linked.lastSeenAt, linked.lastSeenRSSI)])
-            assert(linkedDeviceRSSIRawSamples.count == 0 || zip(linkedDeviceRSSIRawSamples, linkedDeviceRSSIRawSamples.dropFirst()).allSatisfy { current, next in current.a < next.a })
+            linkedDeviceRSSIRawSamples = tail(linkedDeviceRSSIRawSamples + [Tuple2(update.lastSeenAt, update.lastSeenRSSI)])
+            assert(linkedDeviceRSSIRawSamples.count < 2 || zip(linkedDeviceRSSIRawSamples, linkedDeviceRSSIRawSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
 
-            linkedDeviceRSSISmoothedSamples = tail(linkedDeviceRSSISmoothedSamples + [Tuple2(linked.lastSeenAt, linkedDeviceRSSISmoothedSample)])
-            assert(linkedDeviceRSSISmoothedSamples.count == 0 || zip(linkedDeviceRSSISmoothedSamples, linkedDeviceRSSISmoothedSamples.dropFirst()).allSatisfy { current, next in current.a < next.a })
+            linkedDeviceRSSISmoothedSamples = tail(linkedDeviceRSSISmoothedSamples + [Tuple2(update.lastSeenAt, linkedDeviceRSSISmoothedSample)])
+            assert(linkedDeviceRSSISmoothedSamples.count < 2 || zip(linkedDeviceRSSISmoothedSamples, linkedDeviceRSSISmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
 
-            linkedDeviceDistanceSamples = tail(linkedDeviceDistanceSamples + [Tuple2(linked.lastSeenAt, rssiDistance(referenceAtOneMeter: deviceLinkModel.value!.referencePower, current: linkedDeviceRSSISmoothedSample))])
-            assert(linkedDeviceDistanceSamples.count == 0 || zip(linkedDeviceDistanceSamples, linkedDeviceDistanceSamples.dropFirst()).allSatisfy { current, next in current.a < next.a })
+            linkedDeviceDistanceSamples = tail(linkedDeviceDistanceSamples + [Tuple2(update.lastSeenAt, rssiDistance(referenceAtOneMeter: deviceLinkModel.value!.referencePower, current: linkedDeviceRSSISmoothedSample))])
+            assert(linkedDeviceDistanceSamples.count < 2 || zip(linkedDeviceDistanceSamples, linkedDeviceDistanceSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
 
             if device.requireConnection {
                 if bluetoothScanner.connect(maintainConnectionTo: device.uuid) == nil {
