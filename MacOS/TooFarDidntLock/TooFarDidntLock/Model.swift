@@ -5,37 +5,19 @@ import Combine
 
 struct DeviceLinkModel: Equatable {
     var uuid: UUID
-    var deviceDetails: BluetoothDeviceModel
+    var deviceDetails: BluetoothDeviceDescription
+    var deviceState: MonitoredPeripheral?
     var referencePower: Double
     var maxDistance: Double
     var idleTimeout: TimeInterval?
     var requireConnection: Bool
 }
 
-struct BluetoothDeviceModel: Equatable {
-    var uuid: UUID
-    // these may change
+struct BluetoothDeviceDescription: Equatable {
     var name: String?
-    var rssi: Double
     var txPower: Double?
-    var lastSeenAt: Date
-    var isConnected: Bool
 }
 
-
-struct DeviceLinkStorage: Equatable {
-    var uuid: String
-    var deviceDetails: BluetoothDeviceDetailsStorage
-    var referencePower: Double
-    var maxDistance: Double
-    var idleTimeout: TimeInterval?
-    var requireConnection: Bool
-}
-struct BluetoothDeviceDetailsStorage: Equatable {
-    var uuid: String
-    var name: String?
-    var rssi: Double
-}
 struct ApplicationStorage: Equatable {
     // somehow the autogen was not producing the right result
     static func == (lhs: ApplicationStorage, rhs: ApplicationStorage) -> Bool {
@@ -43,7 +25,7 @@ struct ApplicationStorage: Equatable {
         else { return false }
         return true
     }
-    var deviceLink: DeviceLinkStorage?
+    var deviceLink: DeviceLinkModel?
 }
 
 
@@ -82,17 +64,17 @@ extension ApplicationStorage: DictionaryRepresentable {
         return dict
     }
     static func fromDict(dict: [String: Any?]) -> ApplicationStorage? {
-        let deviceLink = dict["deviceLink"]?.flatMap({$0 as? [String: Any?]}).flatMap(DeviceLinkStorage.fromDict)
+        let deviceLink = dict["deviceLink"]?.flatMap({$0 as? [String: Any?]}).flatMap(DeviceLinkModel.fromDict)
         return ApplicationStorage(
             deviceLink: deviceLink
         )
     }
 }
 
-extension DeviceLinkStorage: DictionaryRepresentable {
+extension DeviceLinkModel: DictionaryRepresentable {
     func toDict() -> [String: Any?] {
         let dict: [String: Any?] = [
-            "uuid": self.uuid,
+            "uuid": self.uuid.uuidString,
             "deviceDetails": self.deviceDetails.toDict(),
             "referencePower": self.referencePower,
             "maximumDistance": self.maxDistance,
@@ -101,17 +83,19 @@ extension DeviceLinkStorage: DictionaryRepresentable {
         ]
         return dict
     }
-    static func fromDict(dict: [String: Any?]) -> DeviceLinkStorage? {
-        guard let uuid = dict["uuid"] as? String,
-              let deviceDetails = dict["deviceDetails"]?.flatMap({$0 as? [String: Any?]}).flatMap(BluetoothDeviceDetailsStorage.fromDict),
+    static func fromDict(dict: [String: Any?]) -> DeviceLinkModel? {
+        guard let uuidString = dict["uuid"] as? String,
+              let uuid = UUID(uuidString: uuidString),
+              let deviceDetails = dict["deviceDetails"]?.flatMap({$0 as? [String: Any?]}).flatMap(BluetoothDeviceDescription.fromDict),
               let referencePower = (dict["referencePower"] as? NSNumber)?.doubleValue,
               let maximumDistance = (dict["maximumDistance"] as? NSNumber)?.doubleValue,
               let idleTimeout = (dict["idleTimeout"] as? NSNumber)?.doubleValue,
               let requireConnection = dict["requireConnection"] as? Bool
         else { return nil }
-        return DeviceLinkStorage(
+        return DeviceLinkModel(
             uuid: uuid,
             deviceDetails: deviceDetails,
+            deviceState: nil,
             referencePower: referencePower,
             maxDistance: maximumDistance,
             idleTimeout: idleTimeout,
@@ -120,22 +104,19 @@ extension DeviceLinkStorage: DictionaryRepresentable {
     }
 }
 
-extension BluetoothDeviceDetailsStorage: DictionaryRepresentable {
+extension BluetoothDeviceDescription: DictionaryRepresentable {
     func toDict() -> [String: Any?] {
         let dict: [String: Any?] = [
-            "uuid": self.uuid,
             "name": self.name,
-            "rssi": self.rssi
+            "txPower": self.txPower
         ]
         return dict
     }
-    static func fromDict(dict: [String: Any?]) -> BluetoothDeviceDetailsStorage? {
-        guard let uuid = dict["uuid"] as? String,
-              let rssi = (dict["rssi"] as? NSNumber)?.doubleValue
+    static func fromDict(dict: [String: Any?]) -> BluetoothDeviceDescription? {
+        guard let txPower = (dict["txPower"] as? NSNumber)?.doubleValue
         else { return nil }
-        return BluetoothDeviceDetailsStorage(
-            uuid: uuid,
+        return BluetoothDeviceDescription(
             name: dict["name"] as? String,
-            rssi: rssi)
+            txPower: txPower)
     }
 }
