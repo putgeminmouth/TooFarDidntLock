@@ -3,20 +3,22 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03311BAF2C6F80160058F1B2 /* Link.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03311BAE2C6F80120058F1B2 /* Link.swift */; };
 		037339D72C41F6BE00C1EF0B /* Tab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037339D62C41F6BE00C1EF0B /* Tab.swift */; };
-		037339D92C47344D00C1EF0B /* SwiftUIGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037339D82C47344700C1EF0B /* SwiftUIGlue.swift */; };
 		037339DB2C493D2200C1EF0B /* Util.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037339DA2C493D1E00C1EF0B /* Util.swift */; };
+		0398B3C22C5FA2FB0089DFD6 /* Wifi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0398B3C12C5FA2FB0089DFD6 /* Wifi.swift */; };
+		0398B3C62C679FBB0089DFD6 /* Zone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0398B3C52C679FB70089DFD6 /* Zone.swift */; };
+		03A396042C72318800F211E9 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A396032C72318700F211E9 /* Log.swift */; };
 		03B947C72C30858900E75D5E /* TooFarDidntLockApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947C62C30858900E75D5E /* TooFarDidntLockApp.swift */; };
 		03B947CB2C30858B00E75D5E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 03B947CA2C30858B00E75D5E /* Assets.xcassets */; };
 		03B947CE2C30858C00E75D5E /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 03B947CD2C30858C00E75D5E /* Preview Assets.xcassets */; };
 		03B947D92C30858C00E75D5E /* TooFarDidntLockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947D82C30858C00E75D5E /* TooFarDidntLockTests.swift */; };
 		03B947E32C30858C00E75D5E /* TooFarDidntLockUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947E22C30858C00E75D5E /* TooFarDidntLockUITests.swift */; };
 		03B947E52C30858C00E75D5E /* TooFarDidntLockUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947E42C30858C00E75D5E /* TooFarDidntLockUITestsLaunchTests.swift */; };
-		03B947F52C30865F00E75D5E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947F22C30865E00E75D5E /* SettingsView.swift */; };
 		03B947F62C30865F00E75D5E /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947F32C30865F00E75D5E /* Test.swift */; };
 		03B947F82C30869F00E75D5E /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947F72C30869F00E75D5E /* AboutView.swift */; };
 		03B947FB2C31B93700E75D5E /* Bluetooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947FA2C31B93700E75D5E /* Bluetooth.swift */; };
@@ -42,11 +44,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		03311BAE2C6F80120058F1B2 /* Link.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Link.swift; sourceTree = "<group>"; };
 		037339D62C41F6BE00C1EF0B /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
-		037339D82C47344700C1EF0B /* SwiftUIGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftUIGlue.swift; sourceTree = "<group>"; };
 		037339DA2C493D1E00C1EF0B /* Util.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Util.swift; sourceTree = "<group>"; };
 		037339DC2C4CBA1C00C1EF0B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		037339DD2C4CBADA00C1EF0B /* build.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
+		0398B3C12C5FA2FB0089DFD6 /* Wifi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Wifi.swift; sourceTree = "<group>"; };
+		0398B3C52C679FB70089DFD6 /* Zone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Zone.swift; sourceTree = "<group>"; };
+		03A396032C72318700F211E9 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		03B947C32C30858900E75D5E /* TooFarDidntLock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TooFarDidntLock.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		03B947C62C30858900E75D5E /* TooFarDidntLockApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooFarDidntLockApp.swift; sourceTree = "<group>"; };
 		03B947CA2C30858B00E75D5E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -57,7 +62,6 @@
 		03B947DE2C30858C00E75D5E /* TooFarDidntLockUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TooFarDidntLockUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		03B947E22C30858C00E75D5E /* TooFarDidntLockUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooFarDidntLockUITests.swift; sourceTree = "<group>"; };
 		03B947E42C30858C00E75D5E /* TooFarDidntLockUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooFarDidntLockUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		03B947F22C30865E00E75D5E /* SettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		03B947F32C30865F00E75D5E /* Test.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
 		03B947F72C30869F00E75D5E /* AboutView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		03B947F92C3090DF00E75D5E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -65,6 +69,23 @@
 		03CF7CEC2C3B5B2500AC39E7 /* Timed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timed.swift; sourceTree = "<group>"; };
 		03D4E6B92C363E9C0016FC6B /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0398B3C82C68F2810089DFD6 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BluetoothSettingsView.swift,
+				SettingsView.swift,
+				SwiftUIGlue.swift,
+				ZoneSettingsView.swift,
+			);
+			target = 03B947C22C30858900E75D5E /* TooFarDidntLock */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		0398B3C72C68F2730089DFD6 /* View */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (0398B3C82C68F2810089DFD6 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = View; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		03B947C02C30858900E75D5E /* Frameworks */ = {
@@ -116,9 +137,12 @@
 		03B947C52C30858900E75D5E /* TooFarDidntLock */ = {
 			isa = PBXGroup;
 			children = (
+				0398B3C72C68F2730089DFD6 /* View */,
 				03B947F92C3090DF00E75D5E /* Info.plist */,
-				03B947F22C30865E00E75D5E /* SettingsView.swift */,
-				037339D82C47344700C1EF0B /* SwiftUIGlue.swift */,
+				0398B3C12C5FA2FB0089DFD6 /* Wifi.swift */,
+				0398B3C52C679FB70089DFD6 /* Zone.swift */,
+				03311BAE2C6F80120058F1B2 /* Link.swift */,
+				03A396032C72318700F211E9 /* Log.swift */,
 				03B947F32C30865F00E75D5E /* Test.swift */,
 				03B947FA2C31B93700E75D5E /* Bluetooth.swift */,
 				03B947F72C30869F00E75D5E /* AboutView.swift */,
@@ -291,14 +315,16 @@
 			files = (
 				03D4E6BA2C363E9C0016FC6B /* Model.swift in Sources */,
 				03CF7CED2C3B5B2500AC39E7 /* Timed.swift in Sources */,
-				03B947F52C30865F00E75D5E /* SettingsView.swift in Sources */,
 				037339D72C41F6BE00C1EF0B /* Tab.swift in Sources */,
 				03B947F62C30865F00E75D5E /* Test.swift in Sources */,
-				037339D92C47344D00C1EF0B /* SwiftUIGlue.swift in Sources */,
 				03B947F82C30869F00E75D5E /* AboutView.swift in Sources */,
+				03311BAF2C6F80160058F1B2 /* Link.swift in Sources */,
+				03A396042C72318800F211E9 /* Log.swift in Sources */,
 				037339DB2C493D2200C1EF0B /* Util.swift in Sources */,
 				03B947FB2C31B93700E75D5E /* Bluetooth.swift in Sources */,
 				03B947C72C30858900E75D5E /* TooFarDidntLockApp.swift in Sources */,
+				0398B3C22C5FA2FB0089DFD6 /* Wifi.swift in Sources */,
+				0398B3C62C679FBB0089DFD6 /* Zone.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,6 +485,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = TooFarDidntLock/TooFarDidntLock.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 4;
@@ -488,6 +515,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = TooFarDidntLock/TooFarDidntLock.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 4;

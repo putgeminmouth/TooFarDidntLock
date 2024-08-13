@@ -6,24 +6,25 @@ import ServiceManagement
 
 @main
 struct TooFarDidntLockApp: App {
-    let logger = Logger(subsystem: "TooFarDidntLock", category: "App")
+    let logger = Log.Logger("App")
 
     @AppStorage("app.general.launchAtStartup") var launchAtStartup: Bool = false
     @AppStorage("app.general.showInDock") var showInDock: Bool = true
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     // TODO: debounce by group
-    @State var deviceLinkModel = OptionalModel<DeviceLinkModel>()
     let bluetoothScanner: BluetoothScanner
-    @State var bluetoothDebouncer: Debouncer<MonitoredPeripheral>
-    @Debounced(interval: 2.0) var availableDevices = [MonitoredPeripheral]()
-
-    @Debounced(interval: 2.0) var linkedDeviceRSSIRawSamples = [Tuple2<Date, Double>]()
-    @Debounced(interval: 2.0) var linkedDeviceRSSISmoothedSamples = [Tuple2<Date, Double>]()
-    @Debounced(interval: 2.0) var linkedDeviceDistanceSamples = [Tuple2<Date, Double>]()
-    var smoothingFunc = KalmanFilter(initialState: 0, initialCovariance: 2.01, processNoise: 0.1, measurementNoise: 20.01)
-
+    @State var bluetoothDebouncer: Debouncer<BluetoothDevice>
+//    @Debounced(interval: 2.0) var domainModel = DomainModel(
+    var domainModel: DomainModel
+    var runtimeModel = RuntimeModel()
+    
+    let wifiScanner: WifiScanner
+    let zoneEvaluator: ZoneEvaluator
+    let bluetoothLinkEvaluator: BluetoothLinkEvaluator
+    
     @AppStorage("applicationStorage") var applicationStorage = ApplicationStorage()
+
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.openSettings) var openSettings
 
@@ -34,17 +35,35 @@ struct TooFarDidntLockApp: App {
     @AppStorage("app.locking.safetyPeriodSeconds") var safetyPeriodSeconds: Int = 500
     let safetyPeriodTimer = Timed()
     @State var isSafetyActive: Bool = false
-    @AppStorage("app.locking.cooldownPeriodSeconds") var cooldownPeriodSeconds: Int = 500
+    @AppStorage("app.locking.cooldownPeriodSeconds") var cooldownPeriodSeconds: Int = 60
     let cooldownPeriodTimer = Timed()
     @State var isCooldownActive: Bool = false
     
     @State var menuIconFrame = 0
     
     @State var isScreenLocked = false
-
+    @State var isAppLocked = false
+    
     init() {
         bluetoothScanner = BluetoothScanner(timeToLive: 120)
-        bluetoothDebouncer = Debouncer(debounceInterval: 2, wrapping: bluetoothScanner)
+        bluetoothDebouncer = Debouncer(debounceInterval: 2)
+        
+        domainModel = DomainModel(
+            version: 0,
+            zones: [ManualZone(id: UUID(), name: "Default", active: true)],
+            wellKnownBluetoothDevices: [],
+            links: []
+        )
+        
+        wifiScanner = try! WifiScanner()
+        zoneEvaluator = ZoneEvaluator(
+            manual: ManualZoneEvaluator(),
+            wifi: WifiZoneEvaluator(wifi: wifiScanner))
+        
+        bluetoothLinkEvaluator = BluetoothLinkEvaluator(
+            domainModel: domainModel,
+            runtimeModel: runtimeModel,
+            bluetoothScanner: bluetoothScanner)
     }
     
     var body: some Scene {
@@ -57,89 +76,87 @@ struct TooFarDidntLockApp: App {
                 .onReceive(safetyPeriodTimer) { time in
                     stopSafetyPeriod()
                 }
-                .onReceive(deviceLinkRefreshTimer) { _ in
-                    // TODO
-                    guard !isCooldownActive else { return }
-                    guard !isSafetyActive else { return }
-                    guard let link = deviceLinkModel.value else { return }
-                    
-                    let now = Date.now
-                    let maxAgeSeconds: Double? = link.idleTimeout
-
-                    var age: Double?
-                    var distance: Double?
-                    let peripheral = bluetoothScanner.peripherals.first{$0.peripheral.identifier == link.uuid && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)}
-                    if let peripheral = peripheral  {
-                        age = peripheral.lastSeenAt.distance(to: now)
-                        
-                        if let d = linkedDeviceDistanceSamples.last {
-                            distance = d.second
-                        }
-                    }
-                    if let maxAgeSeconds = maxAgeSeconds {
-                        switch age {
-                        case .some(let age) where age < maxAgeSeconds*0.75:
-                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")
-                        case .some(let age) where age >= maxAgeSeconds*0.75:
-                            logger.debug("[No Signal] Worry \(age) > \(maxAgeSeconds*0.75)")
-                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Worry")
-                        case .some(let age) where age > maxAgeSeconds:
-                            logger.debug("[No Signal] Dizzy \(age) > \(maxAgeSeconds)")
-                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
-                        case .none:
-                            logger.debug("[No Signal] Dizzy (device not found)")
-                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
-                        default:
-                            break
-                        }
-                    }
-
-                    var shouldLock = false
-                    if peripheral == nil {
-                        shouldLock = true
-                    }
-                    if distance ?? 0 > link.maxDistance {
-                        shouldLock = true
-                    }
-                    
-                    if shouldLock {
-                        logger.info("Would lock; distance=\(distance ?? -1) > \(link.maxDistance); disconnected=\(link.requireConnection && !(peripheral?.connectionState == .connected))")
-                        doLock()
-                    }
-                    
+//                .onReceive(deviceLinkRefreshTimer) { _ in
+//                    // TODO
+//                    guard !isCooldownActive else { return }
+//                    guard !isSafetyActive else { return }
+//                    guard let link = deviceLinkModel.value else { return }
+//                    
+//                    let now = Date.now
+//                    let maxAgeSeconds: Double? = link.idleTimeout
+//
+//                    var age: Double?
+//                    var distance: Double?
+//                    let peripheral = bluetoothScanner.peripherals.first{$0.peripheral.identifier == link.uuid && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)}
+//                    if let peripheral = peripheral  {
+//                        age = peripheral.lastSeenAt.distance(to: now)
+//                        
+//                        if let d = linkedDeviceDistanceSamples.last {
+//                            distance = d.second
+//                        }
+//                    }
+//                    if let maxAgeSeconds = maxAgeSeconds {
+//                        switch age {
+//                        case .some(let age) where age < maxAgeSeconds*0.75:
+//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")
+//                        case .some(let age) where age >= maxAgeSeconds*0.75:
+//                            logger.debug("[No Signal] Worry \(age) > \(maxAgeSeconds*0.75)")
+//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Worry")
+//                        case .some(let age) where age > maxAgeSeconds:
+//                            logger.debug("[No Signal] Dizzy \(age) > \(maxAgeSeconds)")
+//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
+//                        case .none:
+//                            logger.debug("[No Signal] Dizzy (device not found)")
+//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
+//                        default:
+//                            break
+//                        }
+//                    }
+//
+//                    var shouldLock = false
+//                    if peripheral == nil {
+//                        shouldLock = true
+//                    }
+//                    if distance ?? 0 > link.maxDistance {
+//                        shouldLock = true
+//                    }
+//                    
+//                    if shouldLock {
+//                        logger.info("Would lock; distance=\(distance ?? -1) > \(link.maxDistance); disconnected=\(link.requireConnection && !(peripheral?.connectionState == .connected))")
+//                        doLock()
+//                    }
+//                    
+//                }
+//                .onChange(of: domainModel.version, initial: false) { old, new in
+                .onReceive(bluetoothLinkEvaluator.linkStateDidChange.eraseToAnyPublisher()) { _ in
+                    maybeLock()
                 }
-                .onChange(of: deviceLinkModel, initial: false) { old, new in
-//                    guard old. != new else { return }
-                    if let newValue = new.value {
-                        applicationStorage.deviceLink = newValue
-                        if old.value?.uuid != newValue.uuid || old.value?.requireConnection != newValue.requireConnection {
-                            if let oldValue = old.value {
-                                bluetoothScanner.disconnect(uuid: oldValue.uuid)
-                            }
-                            smoothingFunc.state = newValue.deviceState?.lastSeenRSSI ?? 0
-                            if newValue.requireConnection {
-                                if bluetoothScanner.connect(maintainConnectionTo: newValue.uuid) == nil {
-                                    logger.info("deviceLinkModel.change: device not found on connect()")
-                                }
-                            }
-                        }
-                    } else {
-                        applicationStorage.deviceLink = nil
+                .onReceive(wifiScanner.didUpdate) { _ in
+                    maybeLock()
+                }
+                .onReceive(domainModel.$version) { new in
+                    logger.debug("onDomainChange(domain=(\(domainModel.version), \(new)); config=\(String(describing: applicationStorage.domainModel?.version))")
+                    guard new > applicationStorage.domainModel?.version ?? 0
+                    else {
+                        logger.debug("onDomainChange.skip(domain=(\(domainModel.version), \(new)); config=\(String(describing: applicationStorage.domainModel?.version))")
+                        return
                     }
+//                    print("onChange(domain) \(old) -> \(new)")
+                    applicationStorage.domainModel = domainModel
+                    logger.debug("onDomainChange.updateStorage(domain=(\(domainModel.version), \(new)); config=\(String(describing: applicationStorage.domainModel?.version))")
                 }
                 .onChange(of: applicationStorage, initial: true) { (old, new) in
-                    // logger.debug("applicationStorage changed")
-                    if let link = new.deviceLink {
-                        deviceLinkModel.value = DeviceLinkModel(
-                            uuid: link.uuid,
-                            deviceDetails: link.deviceDetails,
-                            deviceState: link.deviceState,
-                            referencePower: link.referencePower,
-                            maxDistance: link.maxDistance,
-                            idleTimeout: link.idleTimeout,
-                            requireConnection: link.requireConnection
-                        )
+                    logger.debug("onStorageChange(domain=\(domainModel.version); config=(\(String(describing: old.domainModel?.version)), \(String(describing: new.domainModel?.version))))")
+                    guard new.domainModel?.version ?? 0 > domainModel.version
+                    else {
+                        logger.debug("onStorageChange.skip(domain=\(domainModel.version); config=(\(String(describing: old.domainModel?.version)), \(String(describing: new.domainModel?.version))))")
+                        return
                     }
+                    logger.debug("onStorageChange.updateDomain(domain=\(domainModel.version); config=(\(String(describing: old.domainModel?.version)), \(String(describing: new.domainModel?.version))))")
+                    domainModel.zones = new.domainModel!.zones
+                    domainModel.wellKnownBluetoothDevices = new.domainModel!.wellKnownBluetoothDevices
+                    domainModel.links = new.domainModel!.links
+                    domainModel.setVersion(new.domainModel!.version)
                 }
                 .onChange(of: showInDock, initial: true) { (old, new) in
                     if (new) {
@@ -162,14 +179,6 @@ struct TooFarDidntLockApp: App {
                             logger.error("Failed to unregister service \(error)")
                         }
                     }
-                }
-                .onReceive(bluetoothDebouncer) { peripherals in
-                    for peripheral in peripherals {
-                        onBluetoothScannerUpdate(peripheral)
-                    }
-                }
-                .onReceive(bluetoothScanner.didDisconnect) { uuid in
-                    onBluetoothDidDisconnect(uuid)
                 }
                 .onReceive(appDelegate.statusBarDelegate.willShow) { _ in
                     appDelegate.statusBarDelegate.setItemVisible(tag: 1, visible: isSafetyActive)
@@ -199,22 +208,37 @@ struct TooFarDidntLockApp: App {
                 }
         }
         Settings {
-            SettingsView(deviceLinkModel: $deviceLinkModel,
-                         availableDevices: $availableDevices,
-                         linkedDeviceRSSIRawSamples: $linkedDeviceRSSIRawSamples,
-                         linkedDeviceRSSISmoothedSamples: $linkedDeviceRSSISmoothedSamples,
-                         linkedDeviceDistanceSamples: $linkedDeviceDistanceSamples,
+            SettingsView(
                          launchAtStartup: $launchAtStartup,
                          showInDock: $showInDock,
                          safetyPeriodSeconds: $safetyPeriodSeconds,
                          cooldownPeriodSeconds: $cooldownPeriodSeconds
             )
-//            .environmentObject(EnvBinding<Bool, GeneralSettingsView.LaunchAtStartup>($launchAtStartup))
-//            .environmentObject(EnvBinding<Bool, GeneralSettingsView.ShowInDock>($showInDock))
+            .environmentObject(wifiScanner)
+            .environmentObject(zoneEvaluator)
+            .environmentObject(domainModel)
+            .environmentObject(runtimeModel)
         }
     }
 
+    func maybeLock() {
+        let activeZones = Set(domainModel.zones.filter{zoneEvaluator.isActive($0)}.map{$0.id})
+        let activeZoneLinks = domainModel.links.filter {activeZones.contains($0.zoneId)}
+        let activeLinkStates = activeZoneLinks.flatMap{a in runtimeModel.linkStates.first{$0.id == a.id}}
+        let broken = activeLinkStates.filter{$0.state == .unlinked}
+        guard broken.count > 0
+        else {
+            doUnLock()
+            return
+        }
+        logger.info("Lock due to broken links: \(broken.map{$0.id})")
+        doLock()
+    }
     func doLock() {
+        guard !isAppLocked
+        else { return }
+        isAppLocked = true
+        
         let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_NOW)
         let sym = dlsym(handle, "SACLockScreenImmediate")
         let SACLockScreenImmediate = unsafeBitCast(sym, to: (@convention(c) () -> Int32).self)
@@ -223,6 +247,13 @@ struct TooFarDidntLockApp: App {
         if lockingEnabled {
             let _ = SACLockScreenImmediate()
         }
+    }
+    func doUnLock() {
+        guard isAppLocked
+        else { return }
+        isAppLocked = false
+        
+        appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")
     }
         
     func onApplicationDidFinishLaunching() {
@@ -289,76 +320,12 @@ struct TooFarDidntLockApp: App {
         self.isCooldownActive = false
         self.cooldownPeriodTimer.stop()
     }
-    
-    func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
-        if let index = availableDevices.firstIndex(where: {$0.peripheral.identifier == update.peripheral.identifier }) {
-            availableDevices[index] = update
-        } else {
-            availableDevices.append(update)
-        }
-
-        availableDevices.sort(by: { (lhs, rhs) in
-            let lhsId = lhs.peripheral.identifier
-            let lhsName = lhs.peripheral.name
-            let rhsId = rhs.peripheral.identifier
-            let rhsName = rhs.peripheral.name
-            
-            if lhsId == deviceLinkModel.value?.uuid {
-                return true
-            }
-            if rhsId == deviceLinkModel.value?.uuid {
-                return false
-            }
-            switch (lhsName, rhsName) {
-            case (nil, nil):
-                return lhsId < rhsId
-            case (nil, _):
-                return false
-            case (_, nil):
-                return true
-            default:
-                return lhsName! < rhsName!
-            }
-        })
-
-        if let device = deviceLinkModel.value,
-            update.peripheral.identifier == device.uuid {
-            func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
-                return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
-            }
-            
-            deviceLinkModel.value?.deviceState = update
-            
-            let linkedDeviceRSSISmoothedSample = smoothingFunc.update(measurement: linkedDeviceRSSIRawSamples.last?.b ?? 0)
-
-            linkedDeviceRSSIRawSamples = tail(linkedDeviceRSSIRawSamples + [Tuple2(update.lastSeenAt, update.lastSeenRSSI)])
-            assert(linkedDeviceRSSIRawSamples.count < 2 || zip(linkedDeviceRSSIRawSamples, linkedDeviceRSSIRawSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
-
-            linkedDeviceRSSISmoothedSamples = tail(linkedDeviceRSSISmoothedSamples + [Tuple2(update.lastSeenAt, linkedDeviceRSSISmoothedSample)])
-            assert(linkedDeviceRSSISmoothedSamples.count < 2 || zip(linkedDeviceRSSISmoothedSamples, linkedDeviceRSSISmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
-
-            linkedDeviceDistanceSamples = tail(linkedDeviceDistanceSamples + [Tuple2(update.lastSeenAt, rssiDistance(referenceAtOneMeter: deviceLinkModel.value!.referencePower, current: linkedDeviceRSSISmoothedSample))])
-            assert(linkedDeviceDistanceSamples.count < 2 || zip(linkedDeviceDistanceSamples, linkedDeviceDistanceSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
-
-            if device.requireConnection {
-                if bluetoothScanner.connect(maintainConnectionTo: device.uuid) == nil {
-                    logger.info("onBluetoothScannerUpdate: device not found on connect()")
-                }
-            }
-        }
-    }
-    func onBluetoothDidDisconnect(_ uuid: UUID) {
-        logger.info("Bluetooth disconnected")
-        if deviceLinkModel.value?.requireConnection ?? false {
-            doLock()
-        }
-    }
 }
 
 // MenuBarExtra is all wonky and even with a hidden Window()
 // change/receive are not always called.
 class StatusBarDelegate: NSObject, NSMenuDelegate, ObservableObject {
-    let logger = Logger(subsystem: "TooFarDidntLock", category: "App")
+    let logger = Log.Logger("StatusBarDelegate")
 
     private let aboutWindow: AboutWindow
 

@@ -74,8 +74,21 @@ import Combine
 //}
 //
 struct OptionalModel<A: Equatable>: Equatable {
+    static func == (lhs: OptionalModel<A>, rhs: OptionalModel<A>) -> Bool {
+        return lhs.value == rhs.value
+    }
+    
     var value: A? = nil
 }
+
+struct Model<A: Equatable>: Equatable {
+    static func == (lhs: Model<A>, rhs: Model<A>) -> Bool {
+        return lhs.value == rhs.value
+    }
+    
+    var value: A
+}
+
 //class OptionalModel<A: Equatable>: Equatable, ObservableObject {
 //    static func == (lhs: OptionalModel<A>, rhs: OptionalModel<A>) -> Bool {
 //        return lhs.value == rhs.value
@@ -112,10 +125,34 @@ class ListModel<A: Equatable>: ObservableObject, Equatable {
     }
 }
 
+func bindFunc<T>(_ f: @escaping () -> T) -> Binding<T> {
+    Binding(
+        get: { f() },
+        set: { _ in }
+    )
+}
 func bindOpt<T>(_ lhs: Binding<Optional<T>>, _ rhs: T) -> Binding<T> {
     Binding(
         get: { lhs.wrappedValue ?? rhs },
         set: { lhs.wrappedValue = $0 }
+    )
+}
+//func bindOpt<T>(_ lhs: Binding<OptionalModel<T>>, _ rhs: T) -> Binding<T> {
+//    Binding(
+//        get: { lhs.wrappedValue.value ?? rhs },
+//        set: { lhs.wrappedValue.v = $0 }
+//    )
+//}
+func bindOpt<T,R>(_ lhs: Binding<OptionalModel<T>>, _ get: @escaping (T?) -> R, _ set : @escaping (inout OptionalModel<T>,R) -> Void) -> Binding<R> {
+    Binding(
+        get: { get(lhs.wrappedValue.value) },
+        set: { lhs.wrappedValue.value != nil ? set(&lhs.wrappedValue, $0) : () }
+    )
+}
+func bindAs<A,B>(_ bind: Binding<A>) -> Binding<B> {
+    Binding(
+        get: { bind.wrappedValue as! B },
+        set: { bind.wrappedValue = $0 as! A }
     )
 }
 func bindDecimal(_ lhs: Binding<Decimal>) -> Binding<Float> {
@@ -196,5 +233,46 @@ struct Debounced<T>: DynamicProperty {
         self.debouncedValue = wrappedValue
         self.timer = Timed(interval: interval)
         self.latestValue = wrappedValue
+    }
+}
+
+struct Validation: Hashable, Equatable {
+    let message: String
+}
+
+struct ValidationModifier<T>: ViewModifier where T: Equatable {
+    typealias Validator = () -> [Validation]
+    
+    @Binding var value: T
+    var validator: Validator
+    @State var isValid = false
+    @State var isPopoverPresented = false
+    @State var errors = [Validation]()
+
+    func body(content: Content) -> some View {
+        content
+            .popover(isPresented: $isPopoverPresented) {
+                Group {
+                    VStack {
+                        ForEach(errors, id: \.self) { error in
+                            Text("❌ \(error.message)")
+                        }
+                    }
+                }.onTapGesture {
+                    isPopoverPresented = false
+                }.padding(10)
+            }
+            .onChange(of: value, initial: true) { (_,_) in
+                self.errors = validator()
+                isValid = errors.isEmpty
+                isPopoverPresented = !isValid
+            }
+            .border(Color.red, width: isValid ? 0 : 2)
+    }
+}
+
+extension View {
+    func validate<T: Equatable>(onChangeOf value: Binding<T>, validator: @escaping () -> [Validation]) -> some View {
+        self.modifier(ValidationModifier(value: value, validator: validator))
     }
 }
