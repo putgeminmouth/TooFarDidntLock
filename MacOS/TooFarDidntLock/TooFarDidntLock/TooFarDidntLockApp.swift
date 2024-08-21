@@ -263,7 +263,10 @@ struct TooFarDidntLockApp: App {
         logger.debug("onStart")
 
         let window = NSApp.windows.first(where: {$0.identifier?.rawValue == "DummyWindowToProcessEvents"})
-        window?.alphaValue = 0
+        // voodoo to make this window as non-existant as possible
+        window?.ignoresMouseEvents = true
+//        window?.styleMask = NSWindow.StyleMask.nonactivatingPanel // causes crashes sometimes? maybe it doesn't like main window being nonactivating
+        window?.setContentSize(NSSize(width: 0, height: 0))
         window?.orderOut(nil)
 
         let dnc = DistributedNotificationCenter.default()

@@ -9,7 +9,7 @@ protocol Zone: DictionaryRepresentable {
 }
 
 struct ManualZone: Zone, Equatable {
-    var id: UUID
+    let id: UUID
     var name: String
     var active: Bool
     func equals(_ other: any Zone) -> Bool {
@@ -20,7 +20,7 @@ struct ManualZone: Zone, Equatable {
 }
 
 struct WifiZone: Zone, Equatable {
-    var id: UUID
+    let id: UUID
     var name: String
     var ssid: String?
     var bssid: String?
@@ -42,7 +42,7 @@ protocol LinkState {
     var state: Links.State { get set }
 }
 struct DeviceLinkState: LinkState {
-    var id: UUID
+    let id: UUID
     var state: Links.State
     var rssiRawSamples = [Tuple2<Date, Double>]()
     var rssiSmoothedSamples = [Tuple2<Date, Double>]()
@@ -59,7 +59,7 @@ struct DeviceLinkModel: Link, Equatable {
         return l.zoneId == r.zoneId && l.deviceId == r.deviceId
     }
     
-    var id: UUID
+    let id: UUID
     var zoneId: UUID
     var deviceId: UUID
     var referencePower: Double

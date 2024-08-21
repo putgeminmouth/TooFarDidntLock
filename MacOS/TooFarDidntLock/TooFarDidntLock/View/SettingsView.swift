@@ -140,7 +140,7 @@ struct SettingsView: View {
                 .opacity(0.080)
 
             ATabView {
-                ATab("General", systemName: "gear") {
+                ATab("General", image: Icons.settings.toImage()) {
                     GeneralSettingsView(
                         launchAtStartup: $launchAtStartup,
                         showSettingsAtStartup: $showSettingsAtStartup,
@@ -148,11 +148,14 @@ struct SettingsView: View {
                         safetyPeriodSeconds: $safetyPeriodSeconds,
                         cooldownPeriodSeconds: $cooldownPeriodSeconds)
                 }
-                ATab("Zones", systemName: Icons.zone) {
+                ATab("Zones", image: Icons.zone.toImage()) {
                     ZoneSettingsView()
                 }
-                ATab("Bluetooth", resource: "Bluetooth") {
+                ATab("Bluetooth", image: Icons.bluetooth.toImage()) {
                     BluetoothSettingsView()
+                }
+                ATab("Links", image: Icons.link.toImage()) {
+                    LinksSettingsView()
                 }
             }
         }

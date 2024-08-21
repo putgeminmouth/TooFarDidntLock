@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import UniformTypeIdentifiers
 import OSLog
 import Charts
@@ -20,7 +21,7 @@ struct BluetoothSettingsView: View {
             
             Spacer()
             
-            AvailableDevicesSettingsView()
+            AvailableDevicesSettingsView(selectedId: Binding.constant(UUID()))
         }
         .onChange(of: linkBeingEdited) { (old, new) in
             if let index = domainModel.links.firstIndex{$0.id == new.value?.id} {
@@ -55,12 +56,51 @@ struct DeviceView: View {
     }
 }
 
+struct BluetoothDevicesListView: View {
+
+    @EnvironmentObject var runtimeModel: RuntimeModel
+
+    @Binding var selectedId: UUID
+    @Binding var showOnlyNamedDevices: Bool
+    var callback: ((AnyView, MonitoredPeripheral) -> AnyView)?
+    
+    init(selectedId: Binding<UUID>, showOnlyNamedDevices: Binding<Bool>, items: ((AnyView, MonitoredPeripheral) -> AnyView)? = nil) {
+        self._selectedId = selectedId
+        self._showOnlyNamedDevices = showOnlyNamedDevices
+        self.callback = items
+    }
+
+    var body: some View {
+        let availableDevices = runtimeModel.bluetoothStates
+        let items = showOnlyNamedDevices ? availableDevices.filter{$0.name?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0 > 0} : availableDevices
+        ListView(Binding.constant(items), id: \.wrappedValue.id, selection: $selectedId) { device in
+            let device = device.wrappedValue
+            let row = HStack {
+                DeviceView(
+                    uuid: Binding.constant(device.id.uuidString),
+                    name: Binding.constant(device.name),
+                    rssi: Binding.constant(device.lastSeenRSSI),
+                    lastSeenAt: Binding.constant(nil))
+                // make row occupy full width
+                Spacer()
+                EmptyView()
+            }
+            if let callback = callback {
+                callback(AnyView(row), device)
+            } else {
+                row
+            }
+        }
+    }
+    
+}
 struct AvailableDevicesSettingsView: View {
 
     @EnvironmentObject var runtimeModel: RuntimeModel
 
-    @State var availableDevicesHover: UUID?
     @AppStorage("uipref.bluetooth.showOnlyNamedDevices") var showOnlyNamedDevices: Bool = true
+    
+    @Binding var selectedId: UUID
     
     var body: some View {
         Group() {
@@ -72,23 +112,11 @@ struct AvailableDevicesSettingsView: View {
                         Label("Show only named devices", systemImage: "")
                     }
                 }
-                let availableDevices = runtimeModel.bluetoothStates
-                let items = showOnlyNamedDevices ? availableDevices.filter{$0.name?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0 > 0} : availableDevices
-                List(Binding.constant(items), id: \.id) { device in
-                    VStack(alignment: .leading) {
-                        DeviceView(
-                            uuid: Binding.constant(device.wrappedValue.id.uuidString),
-                            name: Binding.constant(device.wrappedValue.name),
-                            rssi: Binding.constant(device.wrappedValue.lastSeenRSSI),
-                            lastSeenAt: Binding.constant(nil))
-                    }
-                    .frame(maxWidth: /*@START_MENU_TOKEN@*/.infinity/*@END_MENU_TOKEN@*/, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onDrag({ NSItemProvider(object: device.wrappedValue.id.uuidString as NSString) })
-                    .background(availableDevicesHover == device.wrappedValue.id ? Color.gray.opacity(0.3) : Color.clear)
-                    .onHover { hovering in
-                        availableDevicesHover = hovering ? device.wrappedValue.id : nil
-                    }
+                BluetoothDevicesListView(selectedId: $selectedId, showOnlyNamedDevices: $showOnlyNamedDevices) { row, device in
+                    AnyView(
+                        row
+                            .onDrag({ NSItemProvider(object: device.id.uuidString as NSString) })
+                    )
                 }
             }
         }
@@ -195,6 +223,70 @@ struct DeviceMonitorView: View {
     }
 }
 
+struct ZoneSelectionView: View {
+    @EnvironmentObject var domainModel: DomainModel
+
+    var nilMenuText = "Choose a Zone"
+    var nilButtonText = "None"
+    
+    @Binding var selection: UUID?
+    var allowNil = false
+    
+    init(selectionCanBeNil: Binding<UUID?>,
+         nilMenuText: String? = nil,
+         nilButtonText: String? = nil) {
+        self._selection = selectionCanBeNil
+        allowNil = true
+        
+        nilMenuText.map{self.nilMenuText = $0}
+        nilButtonText.map{self.nilButtonText = $0}
+    }
+    init(selectionCanStartNil: Binding<UUID?>,
+         nilMenuText: String? = nil,
+         nilButtonText: String? = nil) {
+        self._selection = selectionCanStartNil
+        allowNil = false
+        
+        nilMenuText.map{self.nilMenuText = $0}
+        nilButtonText.map{self.nilButtonText = $0}
+    }
+    init(selectionNonNil: Binding<UUID>,
+         nilMenuText: String? = nil,
+         nilButtonText: String? = nil) {
+        self._selection = bindAs(selectionNonNil)
+        allowNil = false
+        
+        nilMenuText.map{self.nilMenuText = $0}
+        nilButtonText.map{self.nilButtonText = $0}
+    }
+    
+    var body: some View {
+        let selectedZone = domainModel.zones.first{$0.id == selection}
+        HStack {
+            Icons.zone.toImage()
+                .help("Zone")
+            Menu {
+                if allowNil {
+                    Button {
+                        selection = nil
+                    } label: {
+                        Text(nilButtonText)
+                    }
+                }
+                ForEach($domainModel.zones, id: \.id) { zone in
+                    Button {
+                        selection = zone.wrappedValue.id
+                    } label: {
+                        ZoneMenuItemView(zone: zone)
+                    }
+                }
+            } label: {
+                Label(title: {Text(selectedZone.map{$0.name} ?? nilMenuText)}, icon: {selectedZone.map{Icons.Zones.of($0).toImage()} ?? Image(systemName: "")})
+            }
+        }
+    }
+}
+
 struct DeviceLinkSettingsView: View {
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
@@ -207,26 +299,19 @@ struct DeviceLinkSettingsView: View {
         let linkedDevice = runtimeModel.bluetoothStates.first{$0.id == deviceLinkModel?.deviceId}
         let linkState = runtimeModel.linkStates.first{$0.id == deviceLinkModel?.id}.map{$0 as! DeviceLinkState}
         let availableDevices = runtimeModel.bluetoothStates
+        let linkedZone: Binding<UUID?> = bindOpt(self.$deviceLinkModel,
+                                                 {$0?.zoneId},
+                                                 {$0.value?.zoneId = $1!})
         VStack(alignment: .leading) {
             Text("Drag and drop a device from the list here to link it.")
             GroupBox(label: Label("Linked device", systemImage: "")) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading) {
                         VStack(alignment: .leading) {
-                            HStack {
-                                let selectedZone = domainModel.zones.first{$0.id == deviceLinkModel?.zoneId}
-                                Image(systemName: Icons.zone)
-                                    .help("Linked zone")
-                                Menu(selectedZone.map{$0.name} ?? "Choose a Zone", systemImage: selectedZone.map{Icons.Zones.of($0)} ?? "") {
-                                    ForEach($domainModel.zones, id: \.id) { zone in
-                                        Button {
-                                            self.deviceLinkModel.value!.zoneId = zone.wrappedValue.id
-                                        } label: {
-                                            ZoneMenuItemView(zone: zone)
-                                        }
-                                    }
-                                }
-                            }
+                            ZoneSelectionView(
+                                selectionCanStartNil: linkedZone,
+                                nilMenuText: "Choose a Zone"
+                            )
                             DeviceView(
                                 uuid: Binding.constant(linkedDevice?.id.uuidString),
                                 name: Binding.constant(linkedDevice?.name),
@@ -307,7 +392,8 @@ struct DeviceLinkSettingsView: View {
                             )
                             // drop happens on some ItemProvider thread
                             DispatchQueue.main.async {
-                                domainModel.links = [deviceLink]
+                                domainModel.links.append(deviceLink)
+//                                domainModel.links = [deviceLink]
                                 deviceLinkModel.value = deviceLink
                                 domainModel.wellKnownBluetoothDevices.updateOrAppend(state, where: {$0.id == deviceId})
                             }
@@ -318,3 +404,172 @@ struct DeviceLinkSettingsView: View {
         }
     }
 }
+
+struct EditBluetoothDeviceLinkModal: View {
+    
+    @EnvironmentObject var domainModel: DomainModel
+    @EnvironmentObject var runtimeModel: RuntimeModel
+
+    let zoneId: UUID
+    @State var itemBeingEdited = OptionalModel<DeviceLinkModel>(value: nil)
+    var onDismiss: (DeviceLinkModel?) -> Void
+    @State var selectedDeviceId: UUID? = nil
+    @State var page: String? = "1"
+    
+    init(zoneId: UUID, initialValue: DeviceLinkModel?, onDismiss: @escaping (DeviceLinkModel?) -> Void) {
+        self.zoneId = zoneId
+        self.onDismiss = onDismiss
+
+        // other forms of init break swifui, and no updates happen...
+        self._itemBeingEdited = State(wrappedValue: OptionalModel(value: initialValue))
+    }
+    
+    var body: some View {
+        let page = itemBeingEdited.value == nil ? "1" : "2"
+
+        VStack(alignment: .leading) {
+            let data = domainModel.links
+            VStack(alignment: .leading) {
+                if page == "1" {
+                    GroupBox("Select a device to link") {
+                        BluetoothDevicesListView(selectedId: bindOpt($selectedDeviceId, UUID()), showOnlyNamedDevices: Binding.constant(true))
+                            .onChange(of: selectedDeviceId) {
+                                guard let selectedDevice = runtimeModel.bluetoothStates.first(where: {$0.id == selectedDeviceId})
+                                else { return }
+                                itemBeingEdited.value = DeviceLinkModel(
+                                    id: UUID(),
+                                    zoneId: zoneId,
+                                    deviceId: selectedDevice.id,
+                                    referencePower: selectedDevice.lastSeenRSSI,
+                                    maxDistance: 1.0,
+                                    idleTimeout: 60,
+                                    requireConnection: false)
+                                self.page = "2"
+                            }
+                    }
+                    .frame(minHeight: 300)
+                } else if page == "2" {
+                    GroupBox("Configure") {
+                        DeviceLinkSettingsView(deviceLinkModel: $itemBeingEdited)
+                            .frame(minHeight: 300)
+                    }
+                } else {
+                    EmptyView()
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Cancel"){
+                    onDismiss(nil)
+                }
+                if page == "2" {
+                    Button("OK") {
+                        onDismiss(itemBeingEdited.value)
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+struct LinksSettingsView: View {
+    @EnvironmentObject var domainModel: DomainModel
+    @EnvironmentObject var runtimeModel: RuntimeModel
+
+    @State var zoneIdFilter: UUID? = nil
+    @State var modalIsPresented = false
+    @State var listSelection: UUID = UUID()
+    @State var itemBeingEdited = OptionalModel<DeviceLinkModel>(value: nil)
+    @State var newItemTypeIsPresented = false
+    @State var newItemType: String?
+    
+    var body: some View {
+        let _ = itemBeingEdited
+        let _ = newItemType
+        VStack(alignment: .leading) {
+            ZoneSelectionView(
+                selectionCanBeNil: $zoneIdFilter,
+                nilMenuText: "Filter by Zone",
+                nilButtonText: "All Zones"
+            )
+
+            let data = domainModel.links
+                .filter{zoneIdFilter == nil || $0.zoneId == zoneIdFilter}
+                .map{ model in
+                    let zone = domainModel.zones.first{$0.id == model.zoneId}
+                    let device = runtimeModel.bluetoothStates.first{$0.id == model.deviceId}
+                    return (id: model.id, model: model, state: runtimeModel.linkStates.first{$0.id == model.id }, zone: zone, device: device)
+                }
+            let maxZoneNameWidth = data.flatMap{$0.zone?.name}.map{estimateTextSize(text: $0).width}.max() ?? 0
+
+            ListView(Binding.constant(data), id: \.wrappedValue.id, selection: $listSelection) { link in
+                let link = link.wrappedValue
+                let linkIcon = Icons.Links.of(link.model)
+                let zone = link.zone
+                let zoneIcon = zone.map{Icons.Zones.of($0)}
+                HStack {
+                    if zoneIdFilter == nil {
+                        zoneIcon?.toImage()
+                            .fitSizeAspect(size: 15)
+                        Text("\(zone?.name ?? "")")
+                            .frame(width: maxZoneNameWidth, alignment: .leading)
+                        Divider()
+                    }
+                    linkIcon.toImage()
+                        .fitSizeAspect(size: 15)
+                    Text("\(link.device?.name ?? "")")
+                    Spacer()
+                }
+                .padding([.leading, .trailing], 3)
+                .padding([.top, .bottom], 5)
+                .contentShape(Rectangle()) // makes even empty space clickable
+                .onTapGesture(count: 2) {
+                    itemBeingEdited.value = link.model
+                    modalIsPresented = true
+                }
+            }
+            
+            if let zoneIdFilter = zoneIdFilter ?? domainModel.zones.first.map{$0.id} {
+                Text("")
+                    .sheet(isPresented: $modalIsPresented) {
+                        let _ = assert(newItemType == "Bluetooth")
+                        EditBluetoothDeviceLinkModal(zoneId: zoneIdFilter, initialValue: itemBeingEdited.value, onDismiss: { link in
+                            if let link = link {
+                                domainModel.links.updateOrAppend({link}, where: {$0.id == link.id})
+                            }
+                            modalIsPresented = false
+                        })
+                            .padding()
+                    }
+            }
+
+            HStack {
+                Spacer()
+                
+                Button {
+                    newItemTypeIsPresented = true
+                } label: {
+                    Image(systemName: "plus")
+                        .myButtonLabelStyle()
+                }
+                .myButtonStyle()
+                .popover(isPresented: $newItemTypeIsPresented) {
+                    VStack(alignment: .leading) {
+                        Button {
+                            newItemType = "Bluetooth"
+                            modalIsPresented = true
+                        } label: {
+                            Label(title: {Text("Bluetooth")}, icon: {Icons.bluetooth.toImage().fitSizeAspect(size: 15)})
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .myButtonLabelStyle()
+                        }
+                        .myButtonStyle()
+                        .padding(1)
+                    }.padding(7)
+                }
+            }
+        }
+    }
+}
+
