@@ -16,6 +16,7 @@ struct TooFarDidntLockApp: App {
     // TODO: debounce by group
     let bluetoothScanner: BluetoothScanner
     @State var bluetoothDebouncer: Debouncer<BluetoothDevice>
+    var bluetoothMonitor: BluetoothMonitor
 //    @Debounced(interval: 2.0) var domainModel = DomainModel(
     var domainModel: DomainModel
     var runtimeModel = RuntimeModel()
@@ -47,6 +48,7 @@ struct TooFarDidntLockApp: App {
     init() {
         bluetoothScanner = BluetoothScanner(timeToLive: 120)
         bluetoothDebouncer = Debouncer(debounceInterval: 2)
+        bluetoothMonitor = BluetoothMonitor(bluetoothScanner: bluetoothScanner)
         
         domainModel = DomainModel(
             version: 0,
@@ -63,7 +65,9 @@ struct TooFarDidntLockApp: App {
         bluetoothLinkEvaluator = BluetoothLinkEvaluator(
             domainModel: domainModel,
             runtimeModel: runtimeModel,
-            bluetoothScanner: bluetoothScanner)
+            bluetoothScanner: bluetoothScanner,
+            bluetoothMonitor: bluetoothMonitor
+        )
     }
     
     var body: some Scene {
@@ -174,6 +178,7 @@ struct TooFarDidntLockApp: App {
             .environmentObject(zoneEvaluator)
             .environmentObject(domainModel)
             .environmentObject(runtimeModel)
+            .environmentObject(bluetoothMonitor)
         }
     }
 

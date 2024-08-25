@@ -25,11 +25,17 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
     let logger = Log.Logger("BluetoothLinkEvaluator")
 
     let bluetoothScanner: BluetoothScanner
+    let bluetoothMonitor: BluetoothMonitor
     let updateTimer = Timed().start(interval: 1)
-    init(domainModel: DomainModel, runtimeModel: RuntimeModel, bluetoothScanner: BluetoothScanner) {
+    init(
+        domainModel: DomainModel, runtimeModel: RuntimeModel,
+        bluetoothScanner: BluetoothScanner,
+        bluetoothMonitor: BluetoothMonitor
+    ) {
         self.bluetoothScanner = bluetoothScanner
+        self.bluetoothMonitor = bluetoothMonitor
         super.init(domainModel: domainModel, runtimeModel: runtimeModel)
-        domainModel.$links.withPrevious([])
+        domainModel.$links.withPrevious()
             .sink(receiveValue: self.onLinkModelsChange)
             .store(in: &cancellables)
         bluetoothScanner.didUpdate
@@ -77,7 +83,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         if let peripheral = peripheral  {
             age = peripheral.lastSeenAt.distance(to: now)
 
-            if let d = linkState.distanceSmoothedSamples.last {
+            if let d = linkState.monitorData.data.distanceSmoothedSamples?.last {
                 distance = d.second
             }
         }
@@ -151,24 +157,6 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
     
 
         for link in domainModel.links {
-            if nil == runtimeModel.linkStates.firstIndex{$0.id == link.id} { continue }
-            var stateIndex = runtimeModel.linkStates.firstIndex{$0.id == link.id}!
-            var state = runtimeModel.linkStates[stateIndex] as! BluetoothLinkState
-            func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
-                return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
-            }
-            
-            let rssiSmoothedSample = state.smoothingFunc.update(measurement: state.rssiRawSamples.last?.b ?? 0)
-            
-            state.rssiRawSamples = tail(state.rssiRawSamples + [Tuple2(update.lastSeenAt, update.lastSeenRSSI)])
-            assert(state.rssiRawSamples.count < 2 || zip(state.rssiRawSamples, state.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a }, "\( zip(state.rssiRawSamples, state.rssiRawSamples.dropFirst()).map{"\($0.0.a);\($0.1.a)"})")
-            
-            state.rssiSmoothedSamples = tail(state.rssiSmoothedSamples + [Tuple2(update.lastSeenAt, rssiSmoothedSample)])
-            assert(state.rssiSmoothedSamples.count < 2 || zip(state.rssiSmoothedSamples, state.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
-            
-            state.distanceSmoothedSamples = tail(state.distanceSmoothedSamples + [Tuple2(update.lastSeenAt, rssiDistance(referenceAtOneMeter: link.referencePower, current: rssiSmoothedSample))])
-            assert(state.distanceSmoothedSamples.count < 2 || zip(state.distanceSmoothedSamples, state.distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
-            
             if link.requireConnection {
                 if bluetoothScanner.connect(maintainConnectionTo: link.deviceId) != nil {
                     setLinked(link.id, true)
@@ -177,8 +165,6 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
                     setLinked(link.id, false)
                 }
             }
-
-            runtimeModel.linkStates[stateIndex] = state
         }
     }
     
@@ -188,11 +174,11 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             setLinked(uuid, false)
         }
     }
-    func onLinkModelsChange(_ old: [BluetoothLinkModel], _ new: [BluetoothLinkModel]) {
-        let added = new.filter{n in !old.contains{$0.id == n.id}}
-        let removed = old.filter{o in !new.contains{$0.id == o.id}}
+    func onLinkModelsChange(_ old: [BluetoothLinkModel]?, _ new: [BluetoothLinkModel]) {
+        let added = new.filter{n in !(old ?? []).contains{$0.id == n.id}}
+        let removed = (old ?? []).filter{o in !new.contains{$0.id == o.id}} ?? []
         let changed = new.flatMap{ n in
-            if let o = old.first{$0.id == n.id} {
+            if let o = (old ?? []).first{$0.id == n.id} {
                 return (old: o, new: n)
             } else {
                 return nil
@@ -208,8 +194,15 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             logger.info("link removed: will disconnect \(r.deviceId)")
             bluetoothScanner.disconnect(uuid: r.deviceId)
             setLinked(r.id, false)
+            assert(runtimeModel.linkStates.contains{$0.id == r.id})
+            runtimeModel.linkStates.removeAll{$0.id==r.id}
         }
         for c in changed {
+            assert(runtimeModel.linkStates.contains{$0.id == c.new.id})
+            let linkState = runtimeModel.linkStates.first{$0.id == c.new.id} as! BluetoothLinkState
+            let monitor = linkState.monitorData.data
+            monitor.referenceRSSIAtOneMeter = c.new.referencePower
+
             if c.old.requireConnection != c.new.requireConnection {
                 logger.info("link.requireConnection changed (\(c.new.requireConnection): will disconnect \(c.new.deviceId) and reconnect in a moment as needed")
                 bluetoothScanner.disconnect(uuid: c.new.deviceId)
@@ -217,13 +210,16 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             }
         }
         for a in added {
-            let linkState = runtimeModel.linkStates.first{$0.id==a.id}.flatMap{$0 as? BluetoothLinkState} ?? BluetoothLinkState(id: a.id, state: Links.State.unlinked)
-            
+            assert(!runtimeModel.linkStates.contains{$0.id == a.id})
+            let monitor = bluetoothMonitor.startMonitoring(a.deviceId)
+            monitor.data.referenceRSSIAtOneMeter = a.referencePower
+            monitor.data.distanceSmoothedSamples = []
+
+            let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, monitorData: monitor)
+            runtimeModel.linkStates.append(linkState)
+
             if a.requireConnection {
                 if let deviceState = runtimeModel.bluetoothStates.first{$0.id==a.deviceId} {
-                    // technically we only need to erase the smoothing history if its a different device
-                    linkState.smoothingFunc.state = deviceState.lastSeenRSSI ?? 0
-
                     if bluetoothScanner.connect(maintainConnectionTo: a.deviceId) != nil {
                         setLinked(a.id, true)
                     } else {

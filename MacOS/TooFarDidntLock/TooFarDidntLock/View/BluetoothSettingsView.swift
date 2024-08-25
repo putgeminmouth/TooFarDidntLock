@@ -10,33 +10,34 @@ struct BluetoothSettingsView: View {
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
     @EnvironmentObject var runtimeModel: RuntimeModel
+    @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
 
-    @State var linkBeingEdited: OptionalModel<BluetoothLinkModel> = OptionalModel(value: nil)
-
+    let emptyUUID = UUID()
+    @State var selectedId: UUID?
+    @State var selectedMonitor: BluetoothMonitor.Monitored?
+    
     var body: some View {
-        VStack(alignment: .leading) {
-            BluetoothLinkSettingsView(
-                bluetoothLinkModel: $linkBeingEdited
-            )
-            
-            Spacer()
-            
-            AvailableBluetoothDevicesSettingsView(selectedId: Binding.constant(UUID()))
-        }
-        .onChange(of: linkBeingEdited) { (old, new) in
-            if let index = domainModel.links.firstIndex{$0.id == new.value?.id} {
-                domainModel.links[index] = new.value!
-            }
-        }
-        .onAppear() {
-            // this updates the domainModel but who cares, also this is a temp hax
-            if let link = domainModel.links.first {
-                linkBeingEdited.value = link
+        HStack {
+            AvailableBluetoothDevicesSettingsView(selectedId: bindOpt($selectedId, UUID()))
+            if let monitorData = selectedMonitor?.data {
+                BluetoothDeviceMonitorView(
+                    monitorData: Binding.constant(monitorData)
+                )
+                .frame(minHeight: 200)
             } else {
-                linkBeingEdited.value = nil
+                Text("Select a device")
+                    .frame(idealWidth: .infinity, maxWidth: .infinity, idealHeight: .infinity, maxHeight: .infinity)
+                    .border(Color.primary, width: 1)
             }
         }
-        
+        .onChange(of: selectedId ?? emptyUUID) { (old, new) in
+            if old != emptyUUID {
+                selectedMonitor = nil
+            }
+            if new != emptyUUID {
+                selectedMonitor = bluetoothMonitor.startMonitoring(new)
+            }
+        }
     }
 }
 
@@ -131,22 +132,19 @@ struct BluetoothDeviceMonitorView: View {
         case distance
     }
 
-//    @Binding var bluetoothLinkModel: OptionalModel<DeviceLinkModel>
-    @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
-    @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
-    @Binding var linkedDeviceDistanceSamples: [Tuple2<Date, Double>]
-
-    @State var linkedDeviceChartType = ChartType.distance
+    @Binding var monitorData: BluetoothMonitorData
+    @State var availableChartTypes = [ChartType]()
+    @State var linkedDeviceChartType: ChartType = .distance
     
     @State var chartTypeAdjustedSamples: [Tuple2<Date, Double>] = []
     @State var chartTypeAdjustedYMin: Double = 0
     @State var chartTypeAdjustedYMax: Double = 0
     @State var chartTypeAdjustedYLastUpdated = Date()
 
-    var body: some View {
+    var body: some View {        
         VStack(alignment: .leading) {
             Picker(selection: $linkedDeviceChartType, label: EmptyView()) {
-                ForEach(ChartType.allCases, id: \.self) { type in
+                ForEach(availableChartTypes, id: \.self) { type in
                     switch type {
                     case .rssiRaw:
                         Text("Raw signal power (decibels)").tag(type)
@@ -157,15 +155,13 @@ struct BluetoothDeviceMonitorView: View {
                     }
                 }
             }
-            ZStack {
-                LineChart(
-                    samples: $chartTypeAdjustedSamples,
-                    xRange: 60,
-                    yAxisMin: $chartTypeAdjustedYMin,
-                    yAxisMax: $chartTypeAdjustedYMax)
-            }
+            LineChart(
+                samples: $chartTypeAdjustedSamples,
+                xRange: 60,
+                yAxisMin: $chartTypeAdjustedYMin,
+                yAxisMax: $chartTypeAdjustedYMax)
         }
-        .onChange(of: linkedDeviceRSSIRawSamples, initial: true) {
+        .onChange(of: monitorData.rssiRawSamples, initial: true) {
             recalculate()
             if chartTypeAdjustedSamples.count < 3 {
                 let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSamples)
@@ -178,6 +174,15 @@ struct BluetoothDeviceMonitorView: View {
             let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSamples)
             chartTypeAdjustedYMin = ymin
             chartTypeAdjustedYMax = ymax
+        }
+        .onAppear {
+            if monitorData.distanceSmoothedSamples != nil {
+                availableChartTypes = ChartType.allCases
+                linkedDeviceChartType = .distance
+            } else {
+                availableChartTypes = ChartType.allCases.filter{$0 != .distance}
+                linkedDeviceChartType = .rssiSmoothed
+            }
         }
     }
     func calcBounds(_ samples: [Tuple2<Date, Double>]) -> (sampleMin: Double, sampleMax: Double, ymin: Double, ymax: Double) {
@@ -207,18 +212,19 @@ struct BluetoothDeviceMonitorView: View {
     func recalculate() {
         switch linkedDeviceChartType {
         case .rssiRaw:
-            let samples = linkedDeviceRSSIRawSamples
+            let samples = monitorData.rssiRawSamples
             smoothInterpolateBounds(samples)
             chartTypeAdjustedSamples = samples
         case .rssiSmoothed:
-            let samples = linkedDeviceRSSISmoothedSamples
+            let samples = monitorData.rssiSmoothedSamples
             smoothInterpolateBounds(samples)
             chartTypeAdjustedSamples = samples
         case .distance:
-            let samples = linkedDeviceDistanceSamples
-            smoothInterpolateBounds(samples)
-            chartTypeAdjustedYMin = max(0, chartTypeAdjustedYMin)
-            chartTypeAdjustedSamples = samples
+            if let samples = monitorData.distanceSmoothedSamples {
+                smoothInterpolateBounds(samples)
+                chartTypeAdjustedYMin = max(0, chartTypeAdjustedYMin)
+                chartTypeAdjustedSamples = samples
+            }
         }
     }
 }
@@ -294,11 +300,11 @@ struct BluetoothLinkSettingsView: View {
                         }
                     }
                     
-                    BluetoothDeviceMonitorView(
-                        linkedDeviceRSSIRawSamples: Binding.constant(linkState?.rssiRawSamples ?? []),
-                        linkedDeviceRSSISmoothedSamples: Binding.constant(linkState?.rssiSmoothedSamples ?? []),
-                        linkedDeviceDistanceSamples: Binding.constant(linkState?.distanceSmoothedSamples ?? [])
-                    )
+                    if let monitorData = linkState?.monitorData {
+                        BluetoothDeviceMonitorView(
+                            monitorData: Binding.constant(monitorData.data)
+                        )
+                    }
                 }
                 .frame(maxWidth: /*@START_MENU_TOKEN@*/.infinity/*@END_MENU_TOKEN@*/, alignment: .leading)
                 .onDrop(of: ["public.text"], isTargeted: nil) { providers in

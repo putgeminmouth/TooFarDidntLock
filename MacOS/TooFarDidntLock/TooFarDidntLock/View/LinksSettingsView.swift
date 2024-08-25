@@ -26,7 +26,7 @@ struct LinksSettingsView: View {
                 .map{ model in
                     let zone = domainModel.zones.first{$0.id == model.zoneId}
                     let device = runtimeModel.bluetoothStates.first{$0.id == model.deviceId}
-                    return (id: model.id, model: model, state: runtimeModel.linkStates.first{$0.id == model.id }, zone: zone, device: device)
+                    return (id: model.id, model: model, zone: zone, device: device)
                 }
             let maxZoneNameWidth = data.flatMap{$0.zone?.name}.map{estimateTextSize(text: $0).width}.max() ?? 0
 
@@ -47,6 +47,9 @@ struct LinksSettingsView: View {
                         .fitSizeAspect(size: 15)
                     Text("\(link.device?.name ?? "")")
                     Spacer()
+                    Button("", systemImage: "trash") {
+                        domainModel.links.removeAll{$0.id == link.id}
+                    }.myButtonStyle()
                 }
                 .padding([.leading, .trailing], 3)
                 .padding([.top, .bottom], 5)
@@ -60,7 +63,7 @@ struct LinksSettingsView: View {
             if let zoneIdFilter = zoneIdFilter ?? domainModel.zones.first.map{$0.id} {
                 Text("")
                     .sheet(isPresented: $modalIsPresented) {
-                        let _ = assert(newItemType == "Bluetooth")
+                        let _ = assert(newItemType == nil || newItemType == "Bluetooth")
                         EditBluetoothDeviceLinkModal(zoneId: zoneIdFilter, initialValue: itemBeingEdited.value, onDismiss: { link in
                             if let link = link {
                                 domainModel.links.updateOrAppend({link}, where: {$0.id == link.id})
