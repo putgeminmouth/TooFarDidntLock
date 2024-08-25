@@ -70,6 +70,7 @@ struct LinksSettingsView: View {
                             }
                             modalIsPresented = false
                         })
+                            .frame(minWidth: 700)
                             .padding()
                     }
             }

@@ -1,7 +1,12 @@
 import Foundation
 import SwiftUI
 
-struct ATab: View {
+enum TabContent {
+    case tab(label: String, icon: Image, _ content: () -> any View)
+    case divider
+}
+
+struct Tab: View {
     let label: String
     let image: Image
     let content: AnyView
@@ -23,33 +28,38 @@ struct ATab: View {
     }
 }
 
-struct ATabView: View {
-    let tabs: [ATab]
+struct TabView: View {
+    let tabs: [TabContent]
     @State private var selectedTab = 0
     
-    init(@ViewBuilder _ content: @escaping () -> TupleView<(ATab, ATab, ATab, ATab)>) {
-        let (c1,c2, c3, c4) = content().value
-        self.tabs = [c1, c2, c3, c4]
+    init(_ content: @escaping () -> [TabContent]) {
+        self.tabs = content()
     }
 
     var body: some View {
         VStack() {
             HStack {
                 ForEach(0..<tabs.count, id: \.self) { index in
-                    Button(action: {
-                        selectedTab = index
-                    }) {
-                        VStack(alignment: .center) {
-                            tabs[index].image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 30, height: 30)
-                            Text(tabs[index].label)
-                                .font(.caption)
+                    switch tabs[index] {
+                    case .tab(let label, let icon, _):
+                        Button(action: {
+                            selectedTab = index
+                        }) {
+                            VStack(alignment: .center) {
+                                icon
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 30, height: 30)
+                                Text(label)
+                                    .font(.caption)
+                            }
+                            .colorMultiply(selectedTab == index ? .blue : .white)
                         }
-                        .colorMultiply(selectedTab == index ? .blue : .white)
+                        .buttonStyle(PlainButtonStyle())
+                    case .divider:
+                        Divider()
+                            .frame(height: 30)
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding()
@@ -59,8 +69,10 @@ struct ATabView: View {
             GeometryReader { g in
                 ScrollView {
                     ZStack {
-                        tabs[selectedTab].content
-                            .padding()
+                        if case let .tab(_, _, content) = tabs[selectedTab] {
+                            AnyView(content())
+                                .padding()
+                        }
                     }.frame(width: g.size.width, height: g.size.height, alignment: .top)
                 }.frame(width: g.size.width, height: g.size.height)
             }

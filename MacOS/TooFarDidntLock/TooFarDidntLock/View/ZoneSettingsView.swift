@@ -275,6 +275,7 @@ struct ZoneSettingsView: View {
                 }
                 .padding([.leading, .trailing], 3)
                 .padding([.top, .bottom], 3)
+                .contentShape(Rectangle()) // let even space be clicked
                 .onTapGesture(count: 2) {
                     itemBeingEdited = zone.wrappedValue
                     editIsPresented = true

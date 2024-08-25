@@ -161,7 +161,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
                 if bluetoothScanner.connect(maintainConnectionTo: link.deviceId) != nil {
                     setLinked(link.id, true)
                 } else {
-                    logger.info("onBluetoothScannerUpdate: device not found on connect()")
+                    logger.info("onBluetoothScannerUpdate: device not found on bluetooth update")
                     setLinked(link.id, false)
                 }
             }
@@ -204,7 +204,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             monitor.referenceRSSIAtOneMeter = c.new.referencePower
 
             if c.old.requireConnection != c.new.requireConnection {
-                logger.info("link.requireConnection changed (\(c.new.requireConnection): will disconnect \(c.new.deviceId) and reconnect in a moment as needed")
+                logger.info("link.requireConnection changed \(c.new.requireConnection): will disconnect \(c.new.deviceId) and reconnect in a moment as needed")
                 bluetoothScanner.disconnect(uuid: c.new.deviceId)
                 setLinked(c.new.id, false)
             }
@@ -223,7 +223,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
                     if bluetoothScanner.connect(maintainConnectionTo: a.deviceId) != nil {
                         setLinked(a.id, true)
                     } else {
-                        logger.warning("link added: device not found on connect: \(a.deviceId)")
+                        logger.warning("link added: device not found on new link: \(a.deviceId)")
                     }
                     
                 }

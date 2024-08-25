@@ -216,6 +216,12 @@ class BluetoothActiveConnectionDelegate: Equatable {
     }
     
     func close() {
+        if var device = scanner?.monitoredPeripherals[identifier] {
+            device.connectionState = .disconnected
+            scanner?.monitoredPeripherals[device.id] = device
+            scanner?.didUpdate.send(device)
+        }
+
         timeoutCancellable?.cancel()
         timeoutCancellable = nil
         scanner?.connections.removeValue(forKey: identifier)
@@ -234,6 +240,7 @@ class BluetoothActiveConnectionDelegate: Equatable {
         timeout.stop()
         scanner?.monitoredPeripherals[device.id] = device
         assert(scanner?.connections[device.id] == self)
+        scanner?.didUpdate.send(device)
     }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: (any Error)?) {
@@ -255,17 +262,12 @@ class BluetoothActiveConnectionDelegate: Equatable {
                 device.connectRetriesRemaining -= 1
                 device.connectionState = .reconnecting
                 scanner?.monitoredPeripherals[device.id] = device
+                scanner?.didUpdate.send(device)
             }
             timeout.restart()
             logger.info("Reconnecting to \(peripheral.identifier), retriesRemaining=\(device?.connectRetriesRemaining ?? -1)")
             scanner?.centralManager.connect(peripheral)
         } else {
-            if var device = device {
-                device.connectionState = .disconnected
-                scanner?.monitoredPeripherals[device.id] = device
-            }
-
-            scanner?.connections.removeValue(forKey: peripheral.identifier)
             self.close()
             self.didDisconnect.send(peripheral.identifier)
         }
