@@ -3,7 +3,7 @@ import Combine
 import OSLog
 
 protocol LinkEvaluator: ObservableObject {
-    var linkStateDidChange: any Subject<(data: DeviceLinkModel, oldState: LinkState, newState: LinkState), Never> { get }
+    var linkStateDidChange: any Subject<(data: BluetoothLinkModel, oldState: LinkState, newState: LinkState), Never> { get }
     func domainModelDidChange(_ old: [any Link], _ new: [any Link])
 }
 
@@ -16,7 +16,7 @@ class BaseLinkEvaluator: LinkEvaluator {
         self.runtimeModel = runtimeModel
     }
     
-    var linkStateDidChange: any Subject<(data: DeviceLinkModel, oldState: LinkState, newState: LinkState), Never> = PassthroughSubject<(data: DeviceLinkModel, oldState: LinkState, newState: LinkState), Never>()
+    var linkStateDidChange: any Subject<(data: BluetoothLinkModel, oldState: LinkState, newState: LinkState), Never> = PassthroughSubject<(data: BluetoothLinkModel, oldState: LinkState, newState: LinkState), Never>()
     
     func domainModelDidChange(_ old: [any Link], _ new: [any Link]) {}
 }
@@ -64,8 +64,8 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             onUpdateLinkState(link)
         }
     }
-    func onUpdateLinkState(_ link: DeviceLinkModel) {
-        guard let linkState = runtimeModel.linkStates.first(where:{$0.id == link.id}) as? DeviceLinkState
+    func onUpdateLinkState(_ link: BluetoothLinkModel) {
+        guard let linkState = runtimeModel.linkStates.first(where:{$0.id == link.id}) as? BluetoothLinkState
         else { return }
 
         let now = Date.now
@@ -153,7 +153,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         for link in domainModel.links {
             if nil == runtimeModel.linkStates.firstIndex{$0.id == link.id} { continue }
             var stateIndex = runtimeModel.linkStates.firstIndex{$0.id == link.id}!
-            var state = runtimeModel.linkStates[stateIndex] as! DeviceLinkState
+            var state = runtimeModel.linkStates[stateIndex] as! BluetoothLinkState
             func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
                 return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
             }
@@ -188,7 +188,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             setLinked(uuid, false)
         }
     }
-    func onLinkModelsChange(_ old: [DeviceLinkModel], _ new: [DeviceLinkModel]) {
+    func onLinkModelsChange(_ old: [BluetoothLinkModel], _ new: [BluetoothLinkModel]) {
         let added = new.filter{n in !old.contains{$0.id == n.id}}
         let removed = old.filter{o in !new.contains{$0.id == o.id}}
         let changed = new.flatMap{ n in
@@ -217,7 +217,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             }
         }
         for a in added {
-            let linkState = runtimeModel.linkStates.first{$0.id==a.id}.flatMap{$0 as? DeviceLinkState} ?? DeviceLinkState(id: a.id, state: Links.State.unlinked)
+            let linkState = runtimeModel.linkStates.first{$0.id==a.id}.flatMap{$0 as? BluetoothLinkState} ?? BluetoothLinkState(id: a.id, state: Links.State.unlinked)
             
             if a.requireConnection {
                 if let deviceState = runtimeModel.bluetoothStates.first{$0.id==a.deviceId} {

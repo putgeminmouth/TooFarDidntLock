@@ -41,7 +41,7 @@ protocol LinkState {
     var id: UUID { get }
     var state: Links.State { get set }
 }
-struct DeviceLinkState: LinkState {
+struct BluetoothLinkState: LinkState {
     let id: UUID
     var state: Links.State
     var rssiRawSamples = [Tuple2<Date, Double>]()
@@ -54,8 +54,8 @@ protocol Link {
     var zoneId: UUID { get }
 }
 
-struct DeviceLinkModel: Link, Equatable {
-    static func zd(_ l: DeviceLinkModel, _ r: DeviceLinkModel) -> Bool {
+struct BluetoothLinkModel: Link, Equatable {
+    static func zd(_ l: BluetoothLinkModel, _ r: BluetoothLinkModel) -> Bool {
         return l.zoneId == r.zoneId && l.deviceId == r.deviceId
     }
     
@@ -120,7 +120,7 @@ class DomainModel: ObservableObject, Observable /*Publisher*//*, Equatable */{
             }
         }
     }
-    @Published var links: [DeviceLinkModel] {
+    @Published var links: [BluetoothLinkModel] {
         didSet {
             if oldValue != links {
                 version += 1
@@ -131,7 +131,7 @@ class DomainModel: ObservableObject, Observable /*Publisher*//*, Equatable */{
 //    convenience init() {
 //        self.init(version: 0, zones: [], wellKnownBluetoothDevices: [], links: [])
 //    }
-    init(version: Int, zones: [any Zone], wellKnownBluetoothDevices: [MonitoredPeripheral], links: [DeviceLinkModel]) {
+    init(version: Int, zones: [any Zone], wellKnownBluetoothDevices: [MonitoredPeripheral], links: [BluetoothLinkModel]) {
         self.version = version
         self.zones = zones
         self.wellKnownBluetoothDevices = wellKnownBluetoothDevices
@@ -278,7 +278,7 @@ extension WifiZone: DictionaryRepresentable {
     }
 }
 
-extension DeviceLinkModel: DictionaryRepresentable {
+extension BluetoothLinkModel: DictionaryRepresentable {
     func toDict() -> [String: Any?] {
         let dict: [String: Any?] = [
             "id": self.id.uuidString,
@@ -291,7 +291,7 @@ extension DeviceLinkModel: DictionaryRepresentable {
         ]
         return dict
     }
-    static func fromDict(_ dict: [String: Any?]) -> DeviceLinkModel? {
+    static func fromDict(_ dict: [String: Any?]) -> BluetoothLinkModel? {
         guard let idString = dict["id"] as? String,
               let id = UUID(uuidString: idString),
               let zoneIdString = dict["zoneId"] as? String,
@@ -303,7 +303,7 @@ extension DeviceLinkModel: DictionaryRepresentable {
               let idleTimeout = (dict["idleTimeout"] as? NSNumber)?.doubleValue,
               let requireConnection = dict["requireConnection"] as? Bool
         else { return nil }
-        return DeviceLinkModel(
+        return BluetoothLinkModel(
             id: id,
             zoneId: zoneId,
             deviceId: deviceId,
@@ -401,7 +401,7 @@ extension DomainModel: DictionaryRepresentable {
         else { return nil }
         var zones = zonesDict.flatMap{ZoneDictionaryRepresentable.fromDict($0)}
         let wellKnownBluetoothDevices = wellKnownBluetoothDevicesDict.flatMap{MonitoredPeripheral.fromDict($0)}
-        let links = linksDict.flatMap{DeviceLinkModel.fromDict($0)}
+        let links = linksDict.flatMap{BluetoothLinkModel.fromDict($0)}
         return DomainModel(
             version: version,
             zones: zones,

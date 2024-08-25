@@ -30,7 +30,6 @@ struct TooFarDidntLockApp: App {
     @Environment(\.openSettings) var openSettings
 
     @AppStorage("app.locking.enabled") var lockingEnabled = true
-    let deviceLinkRefreshTimer = Timed().start(interval: 1)
     let appStartTime = Date()
 
     @AppStorage("app.locking.safetyPeriodSeconds") var safetyPeriodSeconds: Int = 500
@@ -77,58 +76,6 @@ struct TooFarDidntLockApp: App {
                 .onReceive(safetyPeriodTimer) { time in
                     stopSafetyPeriod()
                 }
-//                .onReceive(deviceLinkRefreshTimer) { _ in
-//                    // TODO
-//                    guard !isCooldownActive else { return }
-//                    guard !isSafetyActive else { return }
-//                    guard let link = deviceLinkModel.value else { return }
-//                    
-//                    let now = Date.now
-//                    let maxAgeSeconds: Double? = link.idleTimeout
-//
-//                    var age: Double?
-//                    var distance: Double?
-//                    let peripheral = bluetoothScanner.peripherals.first{$0.peripheral.identifier == link.uuid && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)}
-//                    if let peripheral = peripheral  {
-//                        age = peripheral.lastSeenAt.distance(to: now)
-//                        
-//                        if let d = linkedDeviceDistanceSamples.last {
-//                            distance = d.second
-//                        }
-//                    }
-//                    if let maxAgeSeconds = maxAgeSeconds {
-//                        switch age {
-//                        case .some(let age) where age < maxAgeSeconds*0.75:
-//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")
-//                        case .some(let age) where age >= maxAgeSeconds*0.75:
-//                            logger.debug("[No Signal] Worry \(age) > \(maxAgeSeconds*0.75)")
-//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Worry")
-//                        case .some(let age) where age > maxAgeSeconds:
-//                            logger.debug("[No Signal] Dizzy \(age) > \(maxAgeSeconds)")
-//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
-//                        case .none:
-//                            logger.debug("[No Signal] Dizzy (device not found)")
-//                            appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
-//                        default:
-//                            break
-//                        }
-//                    }
-//
-//                    var shouldLock = false
-//                    if peripheral == nil {
-//                        shouldLock = true
-//                    }
-//                    if distance ?? 0 > link.maxDistance {
-//                        shouldLock = true
-//                    }
-//                    
-//                    if shouldLock {
-//                        logger.info("Would lock; distance=\(distance ?? -1) > \(link.maxDistance); disconnected=\(link.requireConnection && !(peripheral?.connectionState == .connected))")
-//                        doLock()
-//                    }
-//                    
-//                }
-//                .onChange(of: domainModel.version, initial: false) { old, new in
                 .onReceive(bluetoothLinkEvaluator.linkStateDidChange.eraseToAnyPublisher()) { _ in
                     maybeLock()
                 }
