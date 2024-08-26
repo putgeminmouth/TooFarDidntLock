@@ -405,9 +405,9 @@ extension DomainModel: DictionaryRepresentable {
               let wellKnownBluetoothDevicesDict = dict["wellKnownBluetoothDevices"] as? [[String: Any?]],
               let linksDict = dict["links"] as? [[String: Any?]]
         else { return nil }
-        var zones = zonesDict.flatMap{ZoneDictionaryRepresentable.fromDict($0)}
-        let wellKnownBluetoothDevices = wellKnownBluetoothDevicesDict.flatMap{MonitoredPeripheral.fromDict($0)}
-        let links = linksDict.flatMap{BluetoothLinkModel.fromDict($0)}
+        let zones = zonesDict.compactMap{ZoneDictionaryRepresentable.fromDict($0)}
+        let wellKnownBluetoothDevices = wellKnownBluetoothDevicesDict.compactMap{MonitoredPeripheral.fromDict($0)}
+        let links = linksDict.compactMap{BluetoothLinkModel.fromDict($0)}
         return DomainModel(
             version: version,
             zones: zones,

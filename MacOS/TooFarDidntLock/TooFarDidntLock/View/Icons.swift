@@ -12,6 +12,7 @@ struct Icons {
                 return Image(resourceName)
             } else {
                 assert(false)
+                return Image(systemName: "questionmark.diamond.fill")
             }
         }
     }
@@ -27,12 +28,14 @@ struct Icons {
             if zone is ManualZone { return manual }
             if zone is WifiZone { return wifi }
             assert(false)
+            return Icon(systemName: "questionmark.diamond.fill")
         }
     }
     struct Links {
         static func of(_ link: any Link) -> Icon {
             if link is BluetoothLinkModel { return bluetooth }
             assert(false)
+            return Icon(systemName: "questionmark.diamond.fill")
         }
     }
 }

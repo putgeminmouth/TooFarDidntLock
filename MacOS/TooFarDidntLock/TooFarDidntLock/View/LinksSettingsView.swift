@@ -28,7 +28,7 @@ struct LinksSettingsView: View {
                     let device = runtimeModel.bluetoothStates.first{$0.id == model.deviceId}
                     return (id: model.id, model: model, zone: zone, device: device)
                 }
-            let maxZoneNameWidth = data.flatMap{$0.zone?.name}.map{estimateTextSize(text: $0).width}.max() ?? 0
+            let maxZoneNameWidth = data.compactMap{$0.zone?.name}.map{estimateTextSize(text: $0).width}.max() ?? 0
 
             ListView(Binding.constant(data), id: \.wrappedValue.id, selection: $listSelection) { link in
                 let link = link.wrappedValue

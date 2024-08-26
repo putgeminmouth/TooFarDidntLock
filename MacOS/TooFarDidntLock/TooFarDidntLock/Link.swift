@@ -116,7 +116,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             runtimeModel.bluetoothStates.append(update)
         }
         
-        for var link in domainModel.links {
+        for link in domainModel.links {
             // remember/cache linked-to devices. this is mainly for display purposes since the scan can
             // take a while to pick up a device or it may not currently be available
             if domainModel.wellKnownBluetoothDevices.first{$0.id == link.deviceId} == nil,
@@ -176,8 +176,8 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
     }
     func onLinkModelsChange(_ old: [BluetoothLinkModel]?, _ new: [BluetoothLinkModel]) {
         let added = new.filter{n in !(old ?? []).contains{$0.id == n.id}}
-        let removed = (old ?? []).filter{o in !new.contains{$0.id == o.id}} ?? []
-        let changed = new.flatMap{ n in
+        let removed = (old ?? []).filter{o in !new.contains{$0.id == o.id}}
+        let changed = new.compactMap{ n in
             if let o = (old ?? []).first{$0.id == n.id} {
                 return (old: o, new: n)
             } else {
@@ -219,13 +219,10 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             runtimeModel.linkStates.append(linkState)
 
             if a.requireConnection {
-                if let deviceState = runtimeModel.bluetoothStates.first{$0.id==a.deviceId} {
-                    if bluetoothScanner.connect(maintainConnectionTo: a.deviceId) != nil {
-                        setLinked(a.id, true)
-                    } else {
-                        logger.warning("link added: device not found on new link: \(a.deviceId)")
-                    }
-                    
+                if bluetoothScanner.connect(maintainConnectionTo: a.deviceId) != nil {
+                    setLinked(a.id, true)
+                } else {
+                    logger.warning("link added: device not found on new link: \(a.deviceId)")
                 }
             } else {
                 setLinked(a.id, true)
