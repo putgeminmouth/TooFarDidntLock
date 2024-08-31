@@ -331,10 +331,13 @@ struct TooFarDidntLockApp: App {
             let linkedDeviceRSSISmoothedSample = smoothingFunc.update(measurement: linkedDeviceRSSIRawSamples.last?.b ?? 0)
 
             linkedDeviceRSSIRawSamples = tail(linkedDeviceRSSIRawSamples + [Tuple2(linked.lastSeenAt, linked.lastSeenRSSI)])
+            assert(linkedDeviceRSSIRawSamples.count == 0 || zip(linkedDeviceRSSIRawSamples, linkedDeviceRSSIRawSamples.dropFirst()).allSatisfy { current, next in current.a < next.a })
 
             linkedDeviceRSSISmoothedSamples = tail(linkedDeviceRSSISmoothedSamples + [Tuple2(linked.lastSeenAt, linkedDeviceRSSISmoothedSample)])
-            
+            assert(linkedDeviceRSSISmoothedSamples.count == 0 || zip(linkedDeviceRSSISmoothedSamples, linkedDeviceRSSISmoothedSamples.dropFirst()).allSatisfy { current, next in current.a < next.a })
+
             linkedDeviceDistanceSamples = tail(linkedDeviceDistanceSamples + [Tuple2(linked.lastSeenAt, rssiDistance(referenceAtOneMeter: deviceLinkModel.value!.referencePower, current: linkedDeviceRSSISmoothedSample))])
+            assert(linkedDeviceDistanceSamples.count == 0 || zip(linkedDeviceDistanceSamples, linkedDeviceDistanceSamples.dropFirst()).allSatisfy { current, next in current.a < next.a })
 
             if device.requireConnection {
                 if bluetoothScanner.connect(uuid: device.uuid) == nil {
