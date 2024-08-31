@@ -222,9 +222,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         }
         for a in added {
             assert(!runtimeModel.linkStates.contains{$0.id == a.id})
-            let monitor = bluetoothMonitor.startMonitoring(a.deviceId)
-            monitor.data.referenceRSSIAtOneMeter = a.referencePower
-            monitor.data.distanceSmoothedSamples = []
+            let monitor = bluetoothMonitor.startMonitoring(a.deviceId, referenceRSSIAtOneMeter: a.referencePower)
             if let smoothingFunc = monitor.data.smoothingFunc {
                 smoothingFunc.processNoise = a.environmentalNoise
             }

@@ -331,15 +331,42 @@ struct BluetoothLinkSettingsView: View {
             .frame(maxWidth: /*@START_MENU_TOKEN@*/.infinity/*@END_MENU_TOKEN@*/, alignment: .leading)            
         }
         .onAppear() {
-            monitor = bluetoothMonitor.startMonitoring(bluetoothLinkModel!.deviceId)
-            monitor!.data.referenceRSSIAtOneMeter = bluetoothLinkModel!.referencePower
-            monitor!.data.distanceSmoothedSamples = []
+            onAppear()
         }
         .onChange(of: bluetoothLinkModel?.referencePower ?? 0) { (old, new) in
             monitor?.data.referenceRSSIAtOneMeter = new
         }
         .onChange(of: bluetoothLinkModel?.environmentalNoise ?? 0) { (old, new) in
             monitor?.data.smoothingFunc?.processNoise = new
+        }
+    }
+    
+    func onAppear() {
+        let bluetoothLinkModel = bluetoothLinkModel.value!
+        let linkedDevice = runtimeModel.value.bluetoothStates.first{$0.id == bluetoothLinkModel.deviceId}!
+        let isNew = domainModel.links.first{$0.id == bluetoothLinkModel.id} == nil
+        monitor = bluetoothMonitor.startMonitoring(bluetoothLinkModel.deviceId, referenceRSSIAtOneMeter: bluetoothLinkModel.referencePower)
+
+
+        // just for the UX, backfill with existing data
+        // if new, pick any available monitor for the device, but recalculate with current settings
+        // if existing, we can keep all the data since we always start with the current settings
+        if isNew {
+            if let data = bluetoothMonitor.dataFor(deviceId: linkedDevice.id).first {
+                monitor!.data.rssiRawSamples = data.rssiRawSamples
+                monitor!.data.smoothingFunc = BluetoothMonitor.initSmoothingFunc(
+                    initialRSSI: monitor!.data.rssiRawSamples.first?.b ?? bluetoothLinkModel.referencePower,
+                    processNoise: bluetoothLinkModel.environmentalNoise
+                )
+            }
+
+            BluetoothMonitor.recalculate(monitorData: monitor!.data)
+        } else {
+            let linkState = runtimeModel.value.linkStates.first{$0.id == bluetoothLinkModel.id} as! BluetoothLinkState
+            monitor!.data.rssiRawSamples = linkState.monitorData.data.rssiRawSamples
+            monitor!.data.rssiSmoothedSamples = linkState.monitorData.data.rssiRawSamples
+            monitor!.data.distanceSmoothedSamples = linkState.monitorData.data.distanceSmoothedSamples
+            monitor!.data.smoothingFunc = linkState.monitorData.data.smoothingFunc
         }
     }
 }
