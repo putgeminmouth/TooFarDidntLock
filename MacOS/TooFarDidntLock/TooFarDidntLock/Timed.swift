@@ -1,0 +1,56 @@
+import SwiftUI
+import OSLog
+import Combine
+
+class Timed: Cancellable, Publisher {
+    typealias Output = Date
+    typealias Failure = Never
+    private let notifier = PassthroughSubject<Output, Failure>()
+    private var publisher: Timer.TimerPublisher?
+    private var sink: Cancellable?
+    private var cancellable: Cancellable?
+
+    func receive<S>(subscriber: S) where S : Subscriber, S.Failure == Failure, S.Input == Output {
+        self.notifier.receive(subscriber: subscriber)
+    }
+
+
+    @discardableResult
+    func start(interval: Int) -> Timed {
+        return self.start(interval: TimeInterval(interval))
+    }
+    @discardableResult
+    func start(interval: TimeInterval) -> Timed {
+        assert(self.cancellable == nil)
+        assert(self.publisher == nil)
+        assert(self.sink == nil)
+        self.publisher = Timer.publish(every: interval, tolerance: nil, on: .main, in: .common)
+        self.sink = self.publisher?.sink(receiveCompletion: {self.notifier.send(completion: $0)}, receiveValue: {self.notifier.send($0)})
+        self.cancellable = publisher?.connect()
+        return self
+    }
+    
+    @discardableResult
+    func stop() -> Timed {
+        self.cancellable?.cancel()
+        self.cancellable = nil
+        self.sink?.cancel()
+        self.sink = nil
+        self.publisher = nil
+        return self
+    }
+    
+    @discardableResult
+    func restart(interval: TimeInterval?) -> Timed {
+        let interval = interval ?? self.publisher?.interval
+        return self.stop().start(interval: interval!)
+    }
+    
+    func cancel() {
+        self.stop()
+    }
+    
+    func isActive() -> Bool {
+        return self.cancellable != nil
+    }
+}
