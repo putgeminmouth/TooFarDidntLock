@@ -13,8 +13,10 @@ func rssiDistance(referenceAtOneMeter: Double, current: Double) -> Double {
 }
 
 /*
- Low R, High Q: The filter trusts the measurements more and adjusts quickly, resulting in a more reactive estimate that closely tracks the true state despite the noise in the process.
- High R, Low Q: The filter trusts the predictions more and smooths out the measurement noise, leading to a more stable estimate but potentially lagging behind sudden changes in the true state.
+ Low R (Measurement Noise), High Q (Process Noise): The filter trusts the measurements more and adjusts quickly, resulting in a more reactive estimate that closely tracks the true state despite the noise in the process.
+ High R (Measurement Noise), Low Q (Process Noise): The filter trusts the predictions more and smooths out the measurement noise, leading to a more stable estimate but potentially lagging behind sudden changes in the true state.
+ 
+ With a lot of process/environmental noise, the prediction is less trusted, making the filter more reactive to pure measurements.
  */
 class KalmanFilter {
     var state: Double

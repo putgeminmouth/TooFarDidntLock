@@ -244,7 +244,6 @@ struct BluetoothLinkSettingsView: View {
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
         VStack(alignment: .leading) {
-            Text("Drag and drop a device from the list here to link it.")
             GroupBox(label: Label("Linked device", systemImage: "")) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading) {
@@ -269,6 +268,14 @@ struct BluetoothLinkSettingsView: View {
                                            {$0?.referencePower ?? 0.0},
                                            {$0.value!.referencePower=$1}),
                             in: -100...0, 
+                            format: {"\(Int($0))"})
+                        LabeledDoubleSlider(
+                            label: "Environmental noise",
+                            description: "TODO",
+                            value: bindOpt($bluetoothLinkModel,
+                                           {$0?.environmentalNoise ?? 0.0},
+                                           {$0.value!.environmentalNoise=$1}),
+                            in: 0...100,
                             format: {"\(Int($0))"})
                         LabeledDoubleSlider(
                             label: "Max distance",
@@ -299,6 +306,8 @@ struct BluetoothLinkSettingsView: View {
                         }
                     }
                     
+                    // TODO: use a new monitor dedicated to this view instead of the link's monitor here
+                    // because we want the view to react live to changes in the model without having to save
                     if let monitorData = linkState?.monitorData {
                         BluetoothDeviceMonitorView(
                             monitorData: Binding.constant(monitorData.data)
@@ -327,6 +336,7 @@ struct BluetoothLinkSettingsView: View {
                                 zoneId: (domainModel.zones.first?.id)!,
                                 deviceId: deviceId,
                                 referencePower: state.lastSeenRSSI,
+                                environmentalNoise: 0,
                                 maxDistance: 1.0,
                                 idleTimeout: 10,
                                 requireConnection: false
@@ -381,6 +391,7 @@ struct EditBluetoothDeviceLinkModal: View {
                                     zoneId: zoneId,
                                     deviceId: selectedDevice.id,
                                     referencePower: selectedDevice.lastSeenRSSI,
+                                    environmentalNoise: 0,
                                     maxDistance: 1.0,
                                     idleTimeout: 60,
                                     requireConnection: false)

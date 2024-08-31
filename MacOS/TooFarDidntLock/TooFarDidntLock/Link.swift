@@ -117,6 +117,12 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         }
         
         for link in domainModel.links {
+            let linkState = runtimeModel.linkStates.first{$0.id == link.id} as! BluetoothLinkState
+            let monitor = linkState.monitorData
+            if let smoothingFunc = monitor.data.smoothingFunc {
+                smoothingFunc.processNoiseCovariance = link.environmentalNoise
+            }
+
             // remember/cache linked-to devices. this is mainly for display purposes since the scan can
             // take a while to pick up a device or it may not currently be available
             if domainModel.wellKnownBluetoothDevices.first{$0.id == link.deviceId} == nil,
@@ -156,16 +162,17 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         })
     
 
-        for link in domainModel.links {
-            if link.requireConnection {
-                if bluetoothScanner.connect(maintainConnectionTo: link.deviceId) != nil {
-                    setLinked(link.id, true)
-                } else {
-                    logger.info("onBluetoothScannerUpdate: device not found on bluetooth update")
-                    setLinked(link.id, false)
-                }
-            }
-        }
+        // TODO: delete this, but double check first
+//        for link in domainModel.links {
+//            if link.requireConnection {
+//                if bluetoothScanner.connect(maintainConnectionTo: link.deviceId) != nil {
+//                    setLinked(link.id, true)
+//                } else {
+//                    logger.info("onBluetoothScannerUpdate: device not found on bluetooth update")
+//                    setLinked(link.id, false)
+//                }
+//            }
+//        }
     }
     
     func onBluetoothDidDisconnect(_ uuid: UUID) {
@@ -200,8 +207,11 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         for c in changed {
             assert(runtimeModel.linkStates.contains{$0.id == c.new.id})
             let linkState = runtimeModel.linkStates.first{$0.id == c.new.id} as! BluetoothLinkState
-            let monitor = linkState.monitorData.data
-            monitor.referenceRSSIAtOneMeter = c.new.referencePower
+            let monitor = linkState.monitorData
+            monitor.data.referenceRSSIAtOneMeter = c.new.referencePower
+            if let smoothingFunc = monitor.data.smoothingFunc {
+                smoothingFunc.processNoiseCovariance = c.new.environmentalNoise
+            }
 
             if c.old.requireConnection != c.new.requireConnection {
                 logger.info("link.requireConnection changed \(c.new.requireConnection): will disconnect \(c.new.deviceId) and reconnect in a moment as needed")
@@ -214,6 +224,9 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let monitor = bluetoothMonitor.startMonitoring(a.deviceId)
             monitor.data.referenceRSSIAtOneMeter = a.referencePower
             monitor.data.distanceSmoothedSamples = []
+            if let smoothingFunc = monitor.data.smoothingFunc {
+                smoothingFunc.processNoiseCovariance = a.environmentalNoise
+            }
 
             let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, monitorData: monitor)
             runtimeModel.linkStates.append(linkState)
