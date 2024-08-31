@@ -41,13 +41,19 @@ protocol LinkState {
     var id: UUID { get }
     var state: Links.State { get set }
 }
+class BluetoothMonitorData {
+    var rssiRawSamples = [Tuple2<Date, Double>]()
+    var rssiSmoothedSamples = [Tuple2<Date, Double>]()
+    
+    var referenceRSSIAtOneMeter: Double?
+    var distanceSmoothedSamples: [Tuple2<Date, Double>]?
+
+    var smoothingFunc: KalmanFilter? = nil
+}
 struct BluetoothLinkState: LinkState {
     let id: UUID
     var state: Links.State
-    var rssiRawSamples = [Tuple2<Date, Double>]()
-    var rssiSmoothedSamples = [Tuple2<Date, Double>]()
-    var distanceSmoothedSamples = [Tuple2<Date, Double>]()
-    var smoothingFunc = KalmanFilter(initialState: 0, initialCovariance: 2.01, processNoise: 0.1, measurementNoise: 20.01)
+    var monitorData: BluetoothMonitor.Monitored
 }
 protocol Link {
     var id: UUID { get }

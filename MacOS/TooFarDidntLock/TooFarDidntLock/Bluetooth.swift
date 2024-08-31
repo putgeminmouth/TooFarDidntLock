@@ -278,3 +278,66 @@ class BluetoothActiveConnectionDelegate: Equatable {
     }
 }
 
+class BluetoothMonitor: ObservableObject {
+    typealias Monitored = (data: BluetoothMonitorData, cancellable: Cancellable)
+    private typealias Monitor = (monitorId: UUID, deviceId: UUID, data: BluetoothMonitorData)
+    private let bluetoothScanner: BluetoothScanner
+    private var cancellable: Cancellable? = nil
+    private var monitors = [Monitor]()
+    
+    init(bluetoothScanner: BluetoothScanner) {
+        self.bluetoothScanner = bluetoothScanner
+        cancellable = bluetoothScanner.didUpdate.sink { self.onBluetoothScannerUpdate($0) }
+    }
+    
+    func startMonitoring(_ id: UUID) -> Monitored {
+        let monitorId = UUID()
+        let monitor: Monitor = (
+            monitorId: monitorId,
+            deviceId: id,
+            data: BluetoothMonitorData()
+        )
+        let cancellable = AnyCancellable {
+            self.monitors.removeAll{$0.monitorId == monitorId}
+        }
+        monitors.append(monitor)
+        return (data: monitor.data, cancellable: cancellable)
+    }
+
+//    func stopMonitoring(_ id: UUID) {
+//        monitors.removeAll{$0.monitorId == }
+//    }
+//    
+//    func data(id: UUID) -> BluetoothMonitorData? {
+//        monitors[id]
+//    }
+    
+    func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
+        func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
+            return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
+        }
+
+        for monitorData in monitors.filter{$0.deviceId == update.id}.map{$0.data} {
+            if monitorData.smoothingFunc == nil {
+                monitorData.smoothingFunc = KalmanFilter(initialState: update.lastSeenRSSI, initialCovariance: 2.01, processNoise: 0.1, measurementNoise: 20.01)
+            }
+            let smoothingFunc = monitorData.smoothingFunc!
+            
+            let rssiSmoothedSample = smoothingFunc.update(measurement: monitorData.rssiRawSamples.last?.b ?? 0)
+            
+            monitorData.rssiRawSamples = tail(monitorData.rssiRawSamples + [Tuple2(update.lastSeenAt, update.lastSeenRSSI)])
+            assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.a);\($0.1.a)"})")
+            
+            monitorData.rssiSmoothedSamples = tail(monitorData.rssiSmoothedSamples + [Tuple2(update.lastSeenAt, rssiSmoothedSample)])
+            assert(monitorData.rssiSmoothedSamples.count < 2 || zip(monitorData.rssiSmoothedSamples, monitorData.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
+            
+            if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter,
+               var distanceSmoothedSamples = monitorData.distanceSmoothedSamples {
+                distanceSmoothedSamples = tail(distanceSmoothedSamples + [Tuple2(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: rssiSmoothedSample))])
+                assert(distanceSmoothedSamples.count < 2 || zip(distanceSmoothedSamples, distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
+                monitorData.distanceSmoothedSamples = distanceSmoothedSamples
+            }
+        }
+    }
+    
+}

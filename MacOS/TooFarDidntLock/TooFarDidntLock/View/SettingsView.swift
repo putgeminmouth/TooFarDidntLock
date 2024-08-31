@@ -40,11 +40,11 @@ struct SettingsView: View {
                 ATab("Zones", image: Icons.zone.toImage()) {
                     ZoneSettingsView()
                 }
-                ATab("Bluetooth", image: Icons.bluetooth.toImage()) {
-                    BluetoothSettingsView()
-                }
                 ATab("Links", image: Icons.link.toImage()) {
                     LinksSettingsView()
+                }
+                ATab("Bluetooth", image: Icons.bluetooth.toImage()) {
+                    BluetoothSettingsView()
                 }
             }
         }
