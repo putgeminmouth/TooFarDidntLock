@@ -19,7 +19,7 @@ struct TooFarDidntLockApp: App {
     @Debounced(interval: 2.0) var linkedDeviceRSSIRawSamples = [Tuple2<Date, Double>]()
     @Debounced(interval: 2.0) var linkedDeviceRSSISmoothedSamples = [Tuple2<Date, Double>]()
     @Debounced(interval: 2.0) var linkedDeviceDistanceSamples = [Tuple2<Date, Double>]()
-    var smoothingFunc = KalmanFilter(initialState: 0, initialCovariance: 2.01, processNoise: 0.1, measurementNoise: 5.01)
+    var smoothingFunc = KalmanFilter(initialState: 0, initialCovariance: 2.01, processNoise: 0.1, measurementNoise: 20.01)
 
     @AppStorage("applicationStorage") var applicationStorage = ApplicationStorage()
     @Environment(\.scenePhase) var scenePhase
@@ -80,12 +80,13 @@ struct TooFarDidntLockApp: App {
                         case .some(let age) where age < maxAgeSeconds*0.75:
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")
                         case .some(let age) where age >= maxAgeSeconds*0.75:
-                            logger.debug("Worry \(age) > \(maxAgeSeconds*0.75)")
+                            logger.debug("[No Signal] Worry \(age) > \(maxAgeSeconds*0.75)")
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Worry")
                         case .some(let age) where age > maxAgeSeconds:
-                            logger.debug("Dizzy \(age) > \(maxAgeSeconds)")
+                            logger.debug("[No Signal] Dizzy \(age) > \(maxAgeSeconds)")
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
                         case .none:
+                            logger.debug("[No Signal] Dizzy (device not found)")
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
                         default:
                             break
@@ -94,9 +95,6 @@ struct TooFarDidntLockApp: App {
 
                     var shouldLock = false
                     if distance ?? 0 > link.maxDistance {
-                        shouldLock = true
-                    }
-                    if link.requireConnection && !(peripheral?.peripheral.isConnected ?? false) {
                         shouldLock = true
                     }
                     
@@ -346,8 +344,10 @@ struct TooFarDidntLockApp: App {
         }
     }
     func onBluetoothDidDisconnect(_ uuid: UUID) {
-        logger.info("disconnected")
-        doLock()
+        logger.info("Bluetooth disconnected")
+        if deviceLinkModel.value?.requireConnection ?? false {
+            doLock()
+        }
     }
 }
 
