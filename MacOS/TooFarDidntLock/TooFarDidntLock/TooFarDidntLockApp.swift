@@ -9,6 +9,7 @@ struct TooFarDidntLockApp: App {
     let logger = Log.Logger("App")
 
     @AppStorage("app.general.launchAtStartup") var launchAtStartup: Bool = false
+    @AppStorage("app.general.showSettingsAtStartup") var showSettingsAtStartup: Bool = true
     @AppStorage("app.general.showInDock") var showInDock: Bool = true
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -210,6 +211,7 @@ struct TooFarDidntLockApp: App {
         Settings {
             SettingsView(
                          launchAtStartup: $launchAtStartup,
+                         showSettingsAtStartup: $showSettingsAtStartup,
                          showInDock: $showInDock,
                          safetyPeriodSeconds: $safetyPeriodSeconds,
                          cooldownPeriodSeconds: $cooldownPeriodSeconds
@@ -281,6 +283,10 @@ struct TooFarDidntLockApp: App {
         appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral", tooltip: "")
 
         startSafetyPeriod()
+        
+        if (showSettingsAtStartup) {
+            openSettings()
+        }
     }
 
     func startSafetyPeriod() {
@@ -487,6 +493,5 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-//        NSApp.setActivationPolicy(.accessory)
     }
 }

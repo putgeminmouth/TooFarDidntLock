@@ -125,6 +125,7 @@ struct SettingsView: View {
     let logger = Log.Logger("SettingsView")
 
     @Binding var launchAtStartup: Bool
+    @Binding var showSettingsAtStartup: Bool
     @Binding var showInDock: Bool
     @Binding var safetyPeriodSeconds: Int
     @Binding var cooldownPeriodSeconds: Int
@@ -142,6 +143,7 @@ struct SettingsView: View {
                 ATab("General", systemName: "gear") {
                     GeneralSettingsView(
                         launchAtStartup: $launchAtStartup,
+                        showSettingsAtStartup: $showSettingsAtStartup,
                         showInDock: $showInDock,
                         safetyPeriodSeconds: $safetyPeriodSeconds,
                         cooldownPeriodSeconds: $cooldownPeriodSeconds)
@@ -162,6 +164,7 @@ struct GeneralSettingsView: View {
     let logger = Log.Logger("GeneralSettingsView")
 
     @Binding var launchAtStartup: Bool
+    @Binding var showSettingsAtStartup: Bool
     @Binding var showInDock: Bool
     @Binding var safetyPeriodSeconds: Int
     @Binding var cooldownPeriodSeconds: Int
@@ -169,7 +172,12 @@ struct GeneralSettingsView: View {
     var body: some View {
         VStack(alignment: .leading) {
             Toggle("Launch at startup", isOn: $launchAtStartup)
+            Toggle("Show this screen on startup", isOn: $showSettingsAtStartup)
             Toggle("Show in dock", isOn: $showInDock)
+            
+            Divider()
+                .padding(20)
+            
             LabeledIntSlider(
                 label: "Safety period",
                 description: "When the app starts up, locking is disabled for a while. This provides a safety window to make sure you can't get permanently locked out.",
