@@ -113,7 +113,7 @@ struct SettingsView: View {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "Settings")
 
     @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
-    @Binding var availableDevices: [BluetoothDeviceModel]
+    @Binding var availableDevices: [MonitoredPeripheral]
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceDistanceSamples: [Tuple2<Date, Double>]
@@ -191,7 +191,7 @@ struct BluetoothSettingsView: View {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "Settings")
 
     @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
-    @Binding var availableDevices: [BluetoothDeviceModel]
+    @Binding var availableDevices: [MonitoredPeripheral]
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceDistanceSamples: [Tuple2<Date, Double>]
@@ -231,7 +231,7 @@ struct DeviceView: View {
 
 struct AvailableDevicesSettingsView: View {
 
-    @Binding var availableDevices: [BluetoothDeviceModel]
+    @Binding var availableDevices: [MonitoredPeripheral]
 
     @State var availableDevicesHover: UUID?
     @AppStorage("uipref.bluetooth.showOnlyNamedDevices") var showOnlyNamedDevices: Bool = true
@@ -246,21 +246,21 @@ struct AvailableDevicesSettingsView: View {
                         Label("Show only named devices", systemImage: "")
                     }
                 }
-                let items = showOnlyNamedDevices ? availableDevices.filter{$0.name?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0 > 0} : availableDevices
-                List(Binding.constant(items), id: \.uuid) { device in
+                let items = showOnlyNamedDevices ? availableDevices.filter{$0.peripheral.name?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0 > 0} : availableDevices
+                List(Binding.constant(items), id: \.peripheral.identifier) { device in
                     VStack(alignment: .leading) {
                         DeviceView(
-                            uuid: Binding.constant(device.wrappedValue.uuid.uuidString),
-                            name: Binding.constant(device.wrappedValue.name),
-                            rssi: Binding.constant(device.wrappedValue.rssi),
+                            uuid: Binding.constant(device.wrappedValue.peripheral.identifier.uuidString),
+                            name: Binding.constant(device.wrappedValue.peripheral.name),
+                            rssi: Binding.constant(device.wrappedValue.lastSeenRSSI),
                             lastSeenAt: Binding.constant(nil))
                     }
                     .frame(maxWidth: /*@START_MENU_TOKEN@*/.infinity/*@END_MENU_TOKEN@*/, alignment: .leading)
                     .contentShape(Rectangle())
-                    .onDrag({ NSItemProvider(object: device.wrappedValue.uuid.uuidString as NSString) })
-                    .background(availableDevicesHover == device.wrappedValue.uuid ? Color.gray.opacity(0.3) : Color.clear)
+                    .onDrag({ NSItemProvider(object: device.wrappedValue.peripheral.identifier.uuidString as NSString) })
+                    .background(availableDevicesHover == device.wrappedValue.peripheral.identifier ? Color.gray.opacity(0.3) : Color.clear)
                     .onHover { hovering in
-                        availableDevicesHover = hovering ? device.wrappedValue.uuid : nil
+                        availableDevicesHover = hovering ? device.wrappedValue.peripheral.identifier : nil
                     }
                 }
             }
@@ -478,7 +478,7 @@ struct DeviceLinkSettingsView: View {
     @Environment(\.scenePhase) var scenePhase
     
     @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
-    @Binding var availableDevices: [BluetoothDeviceModel]
+    @Binding var availableDevices: [MonitoredPeripheral]
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceDistanceSamples: [Tuple2<Date, Double>]
@@ -498,10 +498,10 @@ struct DeviceLinkSettingsView: View {
                         HStack {
                             let linkedDevice = deviceLinkModel.value?.deviceDetails
                             DeviceView(
-                                uuid: Binding.constant(linkedDevice?.uuid.uuidString),
+                                uuid: Binding.constant(deviceLinkModel.value?.uuid.uuidString),
                                 name: Binding.constant(linkedDevice?.name),
-                                rssi: Binding.constant(linkedDevice?.rssi),
-                                lastSeenAt: Binding.constant(linkedDevice?.lastSeenAt))
+                                rssi: Binding.constant(deviceLinkModel.value?.deviceState?.lastSeenRSSI),
+                                lastSeenAt: Binding.constant(deviceLinkModel.value?.deviceState?.lastSeenAt))
                                 .padding(4)
                                 .border(Color.gray, width: 1)
                                 .cornerRadius(2)
@@ -547,7 +547,7 @@ struct DeviceLinkSettingsView: View {
                                         }
                                 }
                             Spacer()
-                            Image(systemName: (deviceLinkModel.value?.deviceDetails.isConnected ?? false) ? "cable.connector" : "cable.connector.slash")
+                            Image(systemName: (deviceLinkModel.value?.deviceState?.connectionState != .disconnected) ? "cable.connector" : "cable.connector.slash")
                                 .colorMultiply(linkedDeviceRequireConnection ? .white : .gray)
                         }
                     }
@@ -564,13 +564,6 @@ struct DeviceLinkSettingsView: View {
                     self.onDeviceLinkDrop(providers)
                     return true
                 }
-            }
-        }
-        // TODO: move into controller code
-        .onChange(of: availableDevices) {
-            if let linkedDevice = deviceLinkModel.value?.deviceDetails,
-               let listedDevice = availableDevices.first(where: {$0.uuid == linkedDevice.uuid}) {
-                deviceLinkModel.value?.deviceDetails = listedDevice
             }
         }
         .onChange(of: scenePhase, initial: true) { (old, new) in
@@ -591,22 +584,26 @@ struct DeviceLinkSettingsView: View {
             if provider.canLoadObject(ofClass: NSString.self) {
                 _ = provider.loadObject(ofClass: NSString.self) { object, _ in
                     if let uuidString = object as? String {
-                        if let device = availableDevices.first(where: {$0.uuid.uuidString == uuidString}) {
+                        if let device = availableDevices.first(where: {$0.peripheral.identifier.uuidString == uuidString}) {
                             // todo, i dont think dispatch was required here
-                            DispatchQueue.main.async {
-                                self.linkedDeviceId = device.uuid
-                                self.linkedDeviceReferencePower = device.rssi
-                                self.linkedDeviceMaxDistance = device.rssi
+//                            DispatchQueue.main.async {
+                                self.linkedDeviceId = device.peripheral.identifier
+                            self.linkedDeviceReferencePower = device.lastSeenRSSI
+                            self.linkedDeviceMaxDistance = device.lastSeenRSSI
 
                                 self.deviceLinkModel.value = DeviceLinkModel(
-                                    uuid: device.uuid,
-                                    deviceDetails: device,
-                                    referencePower: device.rssi,
+                                    uuid: device.peripheral.identifier,
+                                    deviceDetails: BluetoothDeviceDescription(
+                                        name: device.peripheral.name,
+                                        txPower: device.txPower
+                                    ),
+                                    deviceState: device,
+                                    referencePower: device.lastSeenRSSI,
                                     maxDistance: linkedDeviceMaxDistance,
                                     idleTimeout: linkedDeviceIdleTimeout,
                                     requireConnection: linkedDeviceRequireConnection
                                 )
-                            }
+//                            }
                         }
                     }
                 }
