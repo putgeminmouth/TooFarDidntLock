@@ -120,7 +120,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let linkState = runtimeModel.linkStates.first{$0.id == link.id} as! BluetoothLinkState
             let monitor = linkState.monitorData
             if let smoothingFunc = monitor.data.smoothingFunc {
-                smoothingFunc.processNoiseCovariance = link.environmentalNoise
+                smoothingFunc.processNoise = link.environmentalNoise
             }
 
             // remember/cache linked-to devices. this is mainly for display purposes since the scan can
@@ -210,7 +210,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let monitor = linkState.monitorData
             monitor.data.referenceRSSIAtOneMeter = c.new.referencePower
             if let smoothingFunc = monitor.data.smoothingFunc {
-                smoothingFunc.processNoiseCovariance = c.new.environmentalNoise
+                smoothingFunc.processNoise = c.new.environmentalNoise
             }
 
             if c.old.requireConnection != c.new.requireConnection {
@@ -225,7 +225,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             monitor.data.referenceRSSIAtOneMeter = a.referencePower
             monitor.data.distanceSmoothedSamples = []
             if let smoothingFunc = monitor.data.smoothingFunc {
-                smoothingFunc.processNoiseCovariance = a.environmentalNoise
+                smoothingFunc.processNoise = a.environmentalNoise
             }
 
             let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, monitorData: monitor)

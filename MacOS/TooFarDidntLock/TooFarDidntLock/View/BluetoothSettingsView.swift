@@ -233,9 +233,15 @@ struct BluetoothLinkSettingsView: View {
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
     @EnvironmentObject var runtimeModel: RuntimeModel
-    
+    @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
+
+    // TODO: i think this is optional because its easier to pass the binding?
+    // technically this should never be empty
     @Binding var bluetoothLinkModel: OptionalModel<BluetoothLinkModel>
-    
+    // We use a dedicated monitor in this view instead of the link's or another existing monitor
+    // because we want the view to react live without impact to changes in the view without having to save
+    @State var monitor: BluetoothMonitor.Monitored?
+
     var body: some View {
         let bluetoothLinkModel = bluetoothLinkModel.value
         let linkedDevice = runtimeModel.bluetoothStates.first{$0.id == bluetoothLinkModel?.deviceId}
@@ -306,11 +312,9 @@ struct BluetoothLinkSettingsView: View {
                         }
                     }
                     
-                    // TODO: use a new monitor dedicated to this view instead of the link's monitor here
-                    // because we want the view to react live to changes in the model without having to save
-                    if let monitorData = linkState?.monitorData {
+                    if let monitor = monitor {
                         BluetoothDeviceMonitorView(
-                            monitorData: Binding.constant(monitorData.data)
+                            monitorData: Binding.constant(monitor.data)
                         )
                     }
                 }
@@ -320,6 +324,12 @@ struct BluetoothLinkSettingsView: View {
                     return true
                 }
             }
+        }
+        .onAppear() {
+            monitor = bluetoothMonitor.startMonitoring(bluetoothLinkModel!.deviceId)
+        }
+        .onChange(of: bluetoothLinkModel?.environmentalNoise ?? 0) { (old, new) in
+            monitor?.data.smoothingFunc?.processNoise = new
         }
     }
     
