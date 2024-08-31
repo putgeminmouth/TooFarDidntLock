@@ -56,7 +56,7 @@ class Timed: Cancellable, Publisher {
     }
     
     @discardableResult
-    func restart(interval: TimeInterval?) -> Timed {
+    func restart(interval: TimeInterval? = nil) -> Timed {
         let interval = interval ?? (self.interval ?? self.publisher?.interval)
         return self.stop().start(interval: interval!)
     }

@@ -53,6 +53,12 @@ class KalmanFilter {
 
 
 struct MonitoredPeripheral: Hashable, Equatable {
+//    enum ConnectionState {
+//        case connected
+//        case reconnecting
+//        case 
+//    }
+    
     static func == (lhs: MonitoredPeripheral, rhs: MonitoredPeripheral) -> Bool {
         return lhs.peripheral.identifier == rhs.peripheral.identifier
     }
@@ -68,55 +74,7 @@ struct MonitoredPeripheral: Hashable, Equatable {
     }
 }
 
-class Debouncer<Output>: Publisher {
-    typealias Output = [Output]
-    typealias Failure = Never
-
-    private var updatesSinceLastNotiy = [Output]()
-    private var lastNotifiedAt = Date()
-    private var debounceInterval: TimeInterval
-    private let notifier = PassthroughSubject<[Output], Failure>()
-    private let underlying: (any Publisher<Output, Failure>)?
-
-    init(debounceInterval: TimeInterval) {
-        self.debounceInterval = debounceInterval
-        self.underlying = nil
-    }
-    
-    init(debounceInterval: TimeInterval, wrapping underlying: any Publisher<Output, Failure>) {
-        self.debounceInterval = debounceInterval
-        self.underlying = underlying
-        
-        var cancelable: Cancellable?
-        cancelable = underlying.sink { completion in
-            cancelable?.cancel()
-        } receiveValue: { output in
-            self.add(output)
-        }
-    }
-    
-    func receive<S>(subscriber: S) where S : Subscriber, Failure == S.Failure, [Output] == S.Input {
-        self.notifier.receive(subscriber: subscriber)
-    }
-    
-    func add(_ item: Output) {
-        let now = Date.now
-        
-        updatesSinceLastNotiy.append(item)
-        
-        // for now assume a steady stream of data, so we don't worry
-        // about scheduling a later update in case no more data come in to trigger
-        if lastNotifiedAt.distance(to: now) > debounceInterval {
-            notifier.send(updatesSinceLastNotiy)
-            lastNotifiedAt = now
-            updatesSinceLastNotiy.removeAll()
-        }
-    }
-    
-    var debugUpdatesSinceLastNotify: [Output] { updatesSinceLastNotiy }
-}
-
-class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate, CBPeripheralDelegate {
+class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate {
     typealias Output = MonitoredPeripheral
     typealias Failure = Never
 
@@ -165,7 +123,7 @@ class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate, CBPeriphe
         guard !connections.keys.contains(uuid)
         else { return () }
         // could not get CBConnectPeripheralOptionEnableAutoReconnect working
-        connections[uuid] = BluetoothActiveConnectionDelegate(scanner: self)
+        connections[uuid] = BluetoothActiveConnectionDelegate(scanner: self, identifier: uuid)
         device.connectRetriesRemaining = 1
         monitoredPeripherals.update(with: device)
         centralManager.connect(device.peripheral)
@@ -173,7 +131,7 @@ class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate, CBPeriphe
     }
 
     func disconnect(uuid: UUID) {
-        connections.removeValue(forKey: uuid)
+        connections.removeValue(forKey: uuid)?.close()
         if var device = monitoredPeripherals.first(where: {$0.peripheral.identifier == uuid}) {
             device.connectRetriesRemaining = 0
             monitoredPeripherals.update(with: device)
@@ -190,7 +148,9 @@ class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate, CBPeriphe
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        if monitoredPeripherals.first(where: {$0.peripheral.identifier==peripheral.identifier}) == nil {
+        let existing = monitoredPeripherals.first(where: {$0.peripheral.identifier==peripheral.identifier})
+        
+        if existing == nil {
             logger.debug("Discovered \(peripheral.identifier); name=\(peripheral.name ?? "")")
         }
         
@@ -202,7 +162,7 @@ class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate, CBPeriphe
             txPower: advertisementData[CBAdvertisementDataTxPowerLevelKey] as? Double,
             lastSeenRSSI: RSSI.doubleValue,
             lastSeenAt: now,
-            connectRetriesRemaining: 0
+            connectRetriesRemaining: existing?.connectRetriesRemaining ?? 0
         )
         
         monitoredPeripherals = Set([update]).union(monitoredPeripherals).filter{$0.lastSeenAt.distance(to: now) < timeToLive}
@@ -210,16 +170,30 @@ class BluetoothScanner: NSObject, Publisher, CBCentralManagerDelegate, CBPeriphe
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        logger.info("Connected to \(peripheral.identifier); name=\(peripheral.name ?? "")")
+        if let conn = connections.first(where: {$0.key == peripheral.identifier}) {
+            conn.value.centralManager(central, didConnect: peripheral)
+        } else {
+            logger.info("Connected to \(peripheral.identifier); name=\(peripheral.name ?? "")")
+
+        }
     }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: (any Error)?) {
-        logger.info("Failed to connect to \(peripheral.identifier), error=\(error)")
+        if let conn = connections.first(where: {$0.key == peripheral.identifier}) {
+            conn.value.centralManager(central, didFailToConnect: peripheral, error: error)
+        } else {
+            logger.info("Failed to connect to \(peripheral.identifier), error=\(error)")
+
+        }
     }
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, timestamp: CFAbsoluteTime, isReconnecting: Bool, error: (any Error)?) {
-        // code=7 : The specified device has disconnected from us.
-        logger.info("Disconnected from \(peripheral.identifier), isReconnecting=\(isReconnecting), error=\(error)")
+        if let conn = connections.first(where: {$0.key == peripheral.identifier}) {
+            conn.value.centralManager(central, didDisconnectPeripheral: peripheral, timestamp: timestamp, isReconnecting: isReconnecting, error: error)
+        } else {
+            // code=7 : The specified device has disconnected from us.
+            logger.info("Disconnected from \(peripheral.identifier), isReconnecting=\(isReconnecting), error=\(error)")
+        }
     }
 }
 
@@ -231,10 +205,28 @@ class BluetoothActiveConnectionDelegate: Equatable {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "App")
     
     private weak var scanner: BluetoothScanner?
+    private var identifier: UUID
+    // Given the intention of maintaining an active connection,
+    // We use a fairly agressive timeout.
+    // TODO: bump the config up a few levels, possible to the user
+    // CBCentralManager doesn't have an explicit timeout, but it will
+    // eventually give up without notification.
+    // We don't rely on the scanner's TTL since that serves a more general purpose.
+    private let timeout = Timed(interval: 10)
+    private var timeoutCancellable: AnyCancellable?
     let didDisconnect = PassthroughSubject<UUID, Never>()
 
-    init(scanner: BluetoothScanner) {
+    init(scanner: BluetoothScanner, identifier: UUID) {
         self.scanner = scanner
+        self.identifier = identifier
+        self.timeoutCancellable = timeout.sink(receiveValue: timeoutFired)
+    }
+    
+    func close() {
+        timeoutCancellable?.cancel()
+        timeoutCancellable = nil
+        scanner?.connections.removeValue(forKey: identifier)
+        scanner?.disconnect(uuid: identifier)
     }
     
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -245,6 +237,7 @@ class BluetoothActiveConnectionDelegate: Equatable {
         }
         logger.info("Connected to \(peripheral.identifier)")
         device.connectRetriesRemaining = 1
+        timeout.stop()
         scanner?.monitoredPeripherals.update(with: device)
         assert(scanner?.connections[device.peripheral.identifier] == self)
     }
@@ -255,7 +248,8 @@ class BluetoothActiveConnectionDelegate: Equatable {
     }
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, timestamp: CFAbsoluteTime, isReconnecting: Bool, error: (any Error)?) {
-        // code=7 : The specified device has disconnected from us.
+        // code=7 : "The specified device has disconnected from us"
+        // code=13 : "Peer failed to respond to ATT value indication" (seems to happen on "soft" re-enable of bluetooth on iOS)
         logger.info("Disconnected from \(peripheral.identifier), isReconnecting=\(isReconnecting), error=\(error)")
         handleDisconnect(peripheral: peripheral)
     }
@@ -264,13 +258,21 @@ class BluetoothActiveConnectionDelegate: Equatable {
         let device = scanner?.monitoredPeripherals.first(where: {$0.peripheral.identifier==peripheral.identifier})
         if var device = device, device.connectRetriesRemaining > 0 {
             device.connectRetriesRemaining -= 1
+            timeout.restart()
             logger.info("Reconnecting to \(peripheral.identifier), retriesRemaining=\(device.connectRetriesRemaining)")
             scanner?.monitoredPeripherals.update(with: device)
             scanner?.centralManager.connect(peripheral)
         } else {
             scanner?.connections.removeValue(forKey: peripheral.identifier)
+            self.close()
             self.didDisconnect.send(peripheral.identifier)
         }
+    }
+    
+    private func timeoutFired(date: Date) {
+        logger.info("Timed out to \(self.identifier)")
+        self.close()
+        self.didDisconnect.send(identifier)
     }
 }
 

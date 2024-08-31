@@ -1,3 +1,5 @@
+import Combine
+import Foundation
 
 class SimpleMovingAverage {
     private var windowSize: Int
@@ -45,4 +47,52 @@ extension Array {
             self.append(update())
         }
     }
+}
+
+class Debouncer<Output>: Publisher {
+    typealias Output = [Output]
+    typealias Failure = Never
+
+    private var updatesSinceLastNotiy = [Output]()
+    private var lastNotifiedAt = Date()
+    private var debounceInterval: TimeInterval
+    private let notifier = PassthroughSubject<[Output], Failure>()
+    private let underlying: (any Publisher<Output, Failure>)?
+
+    init(debounceInterval: TimeInterval) {
+        self.debounceInterval = debounceInterval
+        self.underlying = nil
+    }
+    
+    init(debounceInterval: TimeInterval, wrapping underlying: any Publisher<Output, Failure>) {
+        self.debounceInterval = debounceInterval
+        self.underlying = underlying
+        
+        var cancelable: Cancellable?
+        cancelable = underlying.sink { completion in
+            cancelable?.cancel()
+        } receiveValue: { output in
+            self.add(output)
+        }
+    }
+    
+    func receive<S>(subscriber: S) where S : Subscriber, Failure == S.Failure, [Output] == S.Input {
+        self.notifier.receive(subscriber: subscriber)
+    }
+    
+    func add(_ item: Output) {
+        let now = Date.now
+        
+        updatesSinceLastNotiy.append(item)
+        
+        // for now assume a steady stream of data, so we don't worry
+        // about scheduling a later update in case no more data come in to trigger
+        if lastNotifiedAt.distance(to: now) > debounceInterval {
+            notifier.send(updatesSinceLastNotiy)
+            lastNotifiedAt = now
+            updatesSinceLastNotiy.removeAll()
+        }
+    }
+    
+    var debugUpdatesSinceLastNotify: [Output] { updatesSinceLastNotiy }
 }
