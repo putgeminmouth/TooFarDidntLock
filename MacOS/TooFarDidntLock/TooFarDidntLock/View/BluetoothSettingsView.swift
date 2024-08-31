@@ -11,17 +11,17 @@ struct BluetoothSettingsView: View {
     @EnvironmentObject var domainModel: DomainModel
     @EnvironmentObject var runtimeModel: RuntimeModel
 
-    @State var linkBeingEdited: OptionalModel<DeviceLinkModel> = OptionalModel(value: nil)
+    @State var linkBeingEdited: OptionalModel<BluetoothLinkModel> = OptionalModel(value: nil)
 
     var body: some View {
         VStack(alignment: .leading) {
-            DeviceLinkSettingsView(
-                deviceLinkModel: $linkBeingEdited
+            BluetoothLinkSettingsView(
+                bluetoothLinkModel: $linkBeingEdited
             )
             
             Spacer()
             
-            AvailableDevicesSettingsView(selectedId: Binding.constant(UUID()))
+            AvailableBluetoothDevicesSettingsView(selectedId: Binding.constant(UUID()))
         }
         .onChange(of: linkBeingEdited) { (old, new) in
             if let index = domainModel.links.firstIndex{$0.id == new.value?.id} {
@@ -40,7 +40,7 @@ struct BluetoothSettingsView: View {
     }
 }
 
-struct DeviceView: View {
+struct BluetoothDeviceView: View {
     @Binding var uuid: String?
     @Binding var name: String?
     @Binding var rssi: Double?
@@ -76,7 +76,7 @@ struct BluetoothDevicesListView: View {
         ListView(Binding.constant(items), id: \.wrappedValue.id, selection: $selectedId) { device in
             let device = device.wrappedValue
             let row = HStack {
-                DeviceView(
+                BluetoothDeviceView(
                     uuid: Binding.constant(device.id.uuidString),
                     name: Binding.constant(device.name),
                     rssi: Binding.constant(device.lastSeenRSSI),
@@ -94,7 +94,7 @@ struct BluetoothDevicesListView: View {
     }
     
 }
-struct AvailableDevicesSettingsView: View {
+struct AvailableBluetoothDevicesSettingsView: View {
 
     @EnvironmentObject var runtimeModel: RuntimeModel
 
@@ -124,14 +124,14 @@ struct AvailableDevicesSettingsView: View {
     }
 }
 
-struct DeviceMonitorView: View {
+struct BluetoothDeviceMonitorView: View {
     enum ChartType: CaseIterable {
         case rssiRaw
         case rssiSmoothed
         case distance
     }
 
-//    @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
+//    @Binding var bluetoothLinkModel: OptionalModel<DeviceLinkModel>
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceDistanceSamples: [Tuple2<Date, Double>]
@@ -223,83 +223,19 @@ struct DeviceMonitorView: View {
     }
 }
 
-struct ZoneSelectionView: View {
-    @EnvironmentObject var domainModel: DomainModel
-
-    var nilMenuText = "Choose a Zone"
-    var nilButtonText = "None"
-    
-    @Binding var selection: UUID?
-    var allowNil = false
-    
-    init(selectionCanBeNil: Binding<UUID?>,
-         nilMenuText: String? = nil,
-         nilButtonText: String? = nil) {
-        self._selection = selectionCanBeNil
-        allowNil = true
-        
-        nilMenuText.map{self.nilMenuText = $0}
-        nilButtonText.map{self.nilButtonText = $0}
-    }
-    init(selectionCanStartNil: Binding<UUID?>,
-         nilMenuText: String? = nil,
-         nilButtonText: String? = nil) {
-        self._selection = selectionCanStartNil
-        allowNil = false
-        
-        nilMenuText.map{self.nilMenuText = $0}
-        nilButtonText.map{self.nilButtonText = $0}
-    }
-    init(selectionNonNil: Binding<UUID>,
-         nilMenuText: String? = nil,
-         nilButtonText: String? = nil) {
-        self._selection = bindAs(selectionNonNil)
-        allowNil = false
-        
-        nilMenuText.map{self.nilMenuText = $0}
-        nilButtonText.map{self.nilButtonText = $0}
-    }
-    
-    var body: some View {
-        let selectedZone = domainModel.zones.first{$0.id == selection}
-        HStack {
-            Icons.zone.toImage()
-                .help("Zone")
-            Menu {
-                if allowNil {
-                    Button {
-                        selection = nil
-                    } label: {
-                        Text(nilButtonText)
-                    }
-                }
-                ForEach($domainModel.zones, id: \.id) { zone in
-                    Button {
-                        selection = zone.wrappedValue.id
-                    } label: {
-                        ZoneMenuItemView(zone: zone)
-                    }
-                }
-            } label: {
-                Label(title: {Text(selectedZone.map{$0.name} ?? nilMenuText)}, icon: {selectedZone.map{Icons.Zones.of($0).toImage()} ?? Image(systemName: "")})
-            }
-        }
-    }
-}
-
-struct DeviceLinkSettingsView: View {
+struct BluetoothLinkSettingsView: View {
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
     @EnvironmentObject var runtimeModel: RuntimeModel
     
-    @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
+    @Binding var bluetoothLinkModel: OptionalModel<BluetoothLinkModel>
     
     var body: some View {
-        let deviceLinkModel = deviceLinkModel.value
-        let linkedDevice = runtimeModel.bluetoothStates.first{$0.id == deviceLinkModel?.deviceId}
-        let linkState = runtimeModel.linkStates.first{$0.id == deviceLinkModel?.id}.map{$0 as! DeviceLinkState}
+        let bluetoothLinkModel = bluetoothLinkModel.value
+        let linkedDevice = runtimeModel.bluetoothStates.first{$0.id == bluetoothLinkModel?.deviceId}
+        let linkState = runtimeModel.linkStates.first{$0.id == bluetoothLinkModel?.id}.map{$0 as! BluetoothLinkState}
         let availableDevices = runtimeModel.bluetoothStates
-        let linkedZone: Binding<UUID?> = bindOpt(self.$deviceLinkModel,
+        let linkedZone: Binding<UUID?> = bindOpt(self.$bluetoothLinkModel,
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
         VStack(alignment: .leading) {
@@ -312,7 +248,7 @@ struct DeviceLinkSettingsView: View {
                                 selectionCanStartNil: linkedZone,
                                 nilMenuText: "Choose a Zone"
                             )
-                            DeviceView(
+                            BluetoothDeviceView(
                                 uuid: Binding.constant(linkedDevice?.id.uuidString),
                                 name: Binding.constant(linkedDevice?.name),
                                 rssi: Binding.constant(linkedDevice?.lastSeenRSSI),
@@ -324,7 +260,7 @@ struct DeviceLinkSettingsView: View {
                         LabeledDoubleSlider(
                             label: "Reference Power",
                             description: "Set to the signal power at 1 meter.",
-                            value: bindOpt($deviceLinkModel,
+                            value: bindOpt($bluetoothLinkModel,
                                            {$0?.referencePower ?? 0.0},
                                            {$0.value!.referencePower=$1}),
                             in: -100...0, 
@@ -332,14 +268,14 @@ struct DeviceLinkSettingsView: View {
                         LabeledDoubleSlider(
                             label: "Max distance",
                             description: "The distance in meters at which the device is considered absent, resulting in a screen lock. It is calculated from the current signal strength and the reference power, and is not very stable or reliable. It is recommended to consider anything less than 5m as close, and anything more as far.",
-                            value: bindOpt($deviceLinkModel,
+                            value: bindOpt($bluetoothLinkModel,
                                            {$0?.maxDistance ?? 0.0},
                                            {$0.value!.maxDistance=$1}),
                             in: 0.0...9.0, step: 0.25, format: {"\(String(format: "%.2f", $0))"})
                         LabeledDoubleSlider(
                             label: "Idle timeout",
                             description: "Device is considered absent if not found for too long, resulting in a screen lock. Unless you configure an active connection, both the host and target device will scan / broadcast at intervals that may vary e.g. due to low power settings. It is recommended to set at least 10-30 seconds.",
-                            value: bindOpt($deviceLinkModel,
+                            value: bindOpt($bluetoothLinkModel,
                                            {$0?.idleTimeout ?? 0.0},
                                            {$0.value!.idleTimeout=$1}),
                             in: 0...10*60, step: 10, format: {formatMinSec(msec: $0)})
@@ -348,17 +284,17 @@ struct DeviceLinkSettingsView: View {
                                 label: "Require connection",
                                 horizontal: true,
                                 description: "When active, the app will attempt to maintain a bluetooth connection to the device, reconnecting as necessary. If the connection fails, the screen will lock.") {
-                                    Toggle("", isOn: bindOpt($deviceLinkModel,
+                                    Toggle("", isOn: bindOpt($bluetoothLinkModel,
                                                              {$0?.requireConnection ?? false},
                                                              {$0.value!.requireConnection=$1}))
                                 }
                             Spacer()
                             Image(systemName: (linkedDevice?.connectionState != .disconnected) ? "cable.connector" : "cable.connector.slash")
-                                .colorMultiply(deviceLinkModel?.requireConnection == true ? .white : .gray)
+                                .colorMultiply(bluetoothLinkModel?.requireConnection == true ? .white : .gray)
                         }
                     }
                     
-                    DeviceMonitorView(
+                    BluetoothDeviceMonitorView(
                         linkedDeviceRSSIRawSamples: Binding.constant(linkState?.rssiRawSamples ?? []),
                         linkedDeviceRSSISmoothedSamples: Binding.constant(linkState?.rssiSmoothedSamples ?? []),
                         linkedDeviceDistanceSamples: Binding.constant(linkState?.distanceSmoothedSamples ?? [])
@@ -381,7 +317,7 @@ struct DeviceLinkSettingsView: View {
                        let deviceId = UUID(uuidString: uuidString) {
                         if let state = runtimeModel.bluetoothStates.first{$0.id == deviceId} {
 
-                            let deviceLink = DeviceLinkModel(
+                            let bluetoothLink = BluetoothLinkModel(
                                 id: UUID(),
                                 zoneId: (domainModel.zones.first?.id)!,
                                 deviceId: deviceId,
@@ -392,9 +328,9 @@ struct DeviceLinkSettingsView: View {
                             )
                             // drop happens on some ItemProvider thread
                             DispatchQueue.main.async {
-                                domainModel.links.append(deviceLink)
-//                                domainModel.links = [deviceLink]
-                                deviceLinkModel.value = deviceLink
+                                domainModel.links.append(bluetoothLink)
+//                                domainModel.links = [bluetoothLink]
+                                bluetoothLinkModel.value = bluetoothLink
                                 domainModel.wellKnownBluetoothDevices.updateOrAppend(state, where: {$0.id == deviceId})
                             }
                         }
@@ -411,12 +347,12 @@ struct EditBluetoothDeviceLinkModal: View {
     @EnvironmentObject var runtimeModel: RuntimeModel
 
     let zoneId: UUID
-    @State var itemBeingEdited = OptionalModel<DeviceLinkModel>(value: nil)
-    var onDismiss: (DeviceLinkModel?) -> Void
+    @State var itemBeingEdited = OptionalModel<BluetoothLinkModel>(value: nil)
+    var onDismiss: (BluetoothLinkModel?) -> Void
     @State var selectedDeviceId: UUID? = nil
     @State var page: String? = "1"
     
-    init(zoneId: UUID, initialValue: DeviceLinkModel?, onDismiss: @escaping (DeviceLinkModel?) -> Void) {
+    init(zoneId: UUID, initialValue: BluetoothLinkModel?, onDismiss: @escaping (BluetoothLinkModel?) -> Void) {
         self.zoneId = zoneId
         self.onDismiss = onDismiss
 
@@ -436,7 +372,7 @@ struct EditBluetoothDeviceLinkModal: View {
                             .onChange(of: selectedDeviceId) {
                                 guard let selectedDevice = runtimeModel.bluetoothStates.first(where: {$0.id == selectedDeviceId})
                                 else { return }
-                                itemBeingEdited.value = DeviceLinkModel(
+                                itemBeingEdited.value = BluetoothLinkModel(
                                     id: UUID(),
                                     zoneId: zoneId,
                                     deviceId: selectedDevice.id,
@@ -450,7 +386,7 @@ struct EditBluetoothDeviceLinkModal: View {
                     .frame(minHeight: 300)
                 } else if page == "2" {
                     GroupBox("Configure") {
-                        DeviceLinkSettingsView(deviceLinkModel: $itemBeingEdited)
+                        BluetoothLinkSettingsView(bluetoothLinkModel: $itemBeingEdited)
                             .frame(minHeight: 300)
                     }
                 } else {
@@ -471,105 +407,3 @@ struct EditBluetoothDeviceLinkModal: View {
         }
     }
 }
-
-
-struct LinksSettingsView: View {
-    @EnvironmentObject var domainModel: DomainModel
-    @EnvironmentObject var runtimeModel: RuntimeModel
-
-    @State var zoneIdFilter: UUID? = nil
-    @State var modalIsPresented = false
-    @State var listSelection: UUID = UUID()
-    @State var itemBeingEdited = OptionalModel<DeviceLinkModel>(value: nil)
-    @State var newItemTypeIsPresented = false
-    @State var newItemType: String?
-    
-    var body: some View {
-        let _ = itemBeingEdited
-        let _ = newItemType
-        VStack(alignment: .leading) {
-            ZoneSelectionView(
-                selectionCanBeNil: $zoneIdFilter,
-                nilMenuText: "Filter by Zone",
-                nilButtonText: "All Zones"
-            )
-
-            let data = domainModel.links
-                .filter{zoneIdFilter == nil || $0.zoneId == zoneIdFilter}
-                .map{ model in
-                    let zone = domainModel.zones.first{$0.id == model.zoneId}
-                    let device = runtimeModel.bluetoothStates.first{$0.id == model.deviceId}
-                    return (id: model.id, model: model, state: runtimeModel.linkStates.first{$0.id == model.id }, zone: zone, device: device)
-                }
-            let maxZoneNameWidth = data.flatMap{$0.zone?.name}.map{estimateTextSize(text: $0).width}.max() ?? 0
-
-            ListView(Binding.constant(data), id: \.wrappedValue.id, selection: $listSelection) { link in
-                let link = link.wrappedValue
-                let linkIcon = Icons.Links.of(link.model)
-                let zone = link.zone
-                let zoneIcon = zone.map{Icons.Zones.of($0)}
-                HStack {
-                    if zoneIdFilter == nil {
-                        zoneIcon?.toImage()
-                            .fitSizeAspect(size: 15)
-                        Text("\(zone?.name ?? "")")
-                            .frame(width: maxZoneNameWidth, alignment: .leading)
-                        Divider()
-                    }
-                    linkIcon.toImage()
-                        .fitSizeAspect(size: 15)
-                    Text("\(link.device?.name ?? "")")
-                    Spacer()
-                }
-                .padding([.leading, .trailing], 3)
-                .padding([.top, .bottom], 5)
-                .contentShape(Rectangle()) // makes even empty space clickable
-                .onTapGesture(count: 2) {
-                    itemBeingEdited.value = link.model
-                    modalIsPresented = true
-                }
-            }
-            
-            if let zoneIdFilter = zoneIdFilter ?? domainModel.zones.first.map{$0.id} {
-                Text("")
-                    .sheet(isPresented: $modalIsPresented) {
-                        let _ = assert(newItemType == "Bluetooth")
-                        EditBluetoothDeviceLinkModal(zoneId: zoneIdFilter, initialValue: itemBeingEdited.value, onDismiss: { link in
-                            if let link = link {
-                                domainModel.links.updateOrAppend({link}, where: {$0.id == link.id})
-                            }
-                            modalIsPresented = false
-                        })
-                            .padding()
-                    }
-            }
-
-            HStack {
-                Spacer()
-                
-                Button {
-                    newItemTypeIsPresented = true
-                } label: {
-                    Image(systemName: "plus")
-                        .myButtonLabelStyle()
-                }
-                .myButtonStyle()
-                .popover(isPresented: $newItemTypeIsPresented) {
-                    VStack(alignment: .leading) {
-                        Button {
-                            newItemType = "Bluetooth"
-                            modalIsPresented = true
-                        } label: {
-                            Label(title: {Text("Bluetooth")}, icon: {Icons.bluetooth.toImage().fitSizeAspect(size: 15)})
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .myButtonLabelStyle()
-                        }
-                        .myButtonStyle()
-                        .padding(1)
-                    }.padding(7)
-                }
-            }
-        }
-    }
-}
-

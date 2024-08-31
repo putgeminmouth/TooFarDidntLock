@@ -31,7 +31,7 @@ struct Icons {
     }
     struct Links {
         static func of(_ link: any Link) -> Icon {
-            if link is DeviceLinkModel { return bluetooth }
+            if link is BluetoothLinkModel { return bluetooth }
             assert(false)
         }
     }

@@ -18,7 +18,6 @@
 		03B947D92C30858C00E75D5E /* TooFarDidntLockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947D82C30858C00E75D5E /* TooFarDidntLockTests.swift */; };
 		03B947E32C30858C00E75D5E /* TooFarDidntLockUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947E22C30858C00E75D5E /* TooFarDidntLockUITests.swift */; };
 		03B947E52C30858C00E75D5E /* TooFarDidntLockUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947E42C30858C00E75D5E /* TooFarDidntLockUITestsLaunchTests.swift */; };
-		03B947F62C30865F00E75D5E /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947F32C30865F00E75D5E /* Test.swift */; };
 		03B947F82C30869F00E75D5E /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947F72C30869F00E75D5E /* AboutView.swift */; };
 		03B947FB2C31B93700E75D5E /* Bluetooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947FA2C31B93700E75D5E /* Bluetooth.swift */; };
 		03CF7CED2C3B5B2500AC39E7 /* Timed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CF7CEC2C3B5B2500AC39E7 /* Timed.swift */; };
@@ -60,7 +59,6 @@
 		03B947DE2C30858C00E75D5E /* TooFarDidntLockUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TooFarDidntLockUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		03B947E22C30858C00E75D5E /* TooFarDidntLockUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooFarDidntLockUITests.swift; sourceTree = "<group>"; };
 		03B947E42C30858C00E75D5E /* TooFarDidntLockUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooFarDidntLockUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		03B947F32C30865F00E75D5E /* Test.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
 		03B947F72C30869F00E75D5E /* AboutView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		03B947F92C3090DF00E75D5E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		03B947FA2C31B93700E75D5E /* Bluetooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bluetooth.swift; sourceTree = "<group>"; };
@@ -74,9 +72,13 @@
 			membershipExceptions = (
 				BluetoothSettingsView.swift,
 				Icons.swift,
+				LinksSettingsView.swift,
+				ListView.swift,
+				MiscViews.swift,
 				SettingsView.swift,
 				SwiftUIGlue.swift,
-				Tab.swift,
+				TabView.swift,
+				ZoneSelectionView.swift,
 				ZoneSettingsView.swift,
 			);
 			target = 03B947C22C30858900E75D5E /* TooFarDidntLock */;
@@ -143,7 +145,6 @@
 				0398B3C52C679FB70089DFD6 /* Zone.swift */,
 				03311BAE2C6F80120058F1B2 /* Link.swift */,
 				03A396032C72318700F211E9 /* Log.swift */,
-				03B947F32C30865F00E75D5E /* Test.swift */,
 				03B947FA2C31B93700E75D5E /* Bluetooth.swift */,
 				03B947F72C30869F00E75D5E /* AboutView.swift */,
 				03B947C62C30858900E75D5E /* TooFarDidntLockApp.swift */,
@@ -314,7 +315,6 @@
 			files = (
 				03D4E6BA2C363E9C0016FC6B /* Model.swift in Sources */,
 				03CF7CED2C3B5B2500AC39E7 /* Timed.swift in Sources */,
-				03B947F62C30865F00E75D5E /* Test.swift in Sources */,
 				03B947F82C30869F00E75D5E /* AboutView.swift in Sources */,
 				03311BAF2C6F80160058F1B2 /* Link.swift in Sources */,
 				03A396042C72318800F211E9 /* Log.swift in Sources */,
