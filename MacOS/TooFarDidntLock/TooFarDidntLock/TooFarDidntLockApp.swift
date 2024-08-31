@@ -1,6 +1,7 @@
 import SwiftUI
 import OSLog
 import Combine
+import CoreBluetooth
 
 @main
 struct TooFarDidntLockApp: App {
@@ -9,14 +10,16 @@ struct TooFarDidntLockApp: App {
     @AppStorage("app.general.launchAtStartup") var launchAtStartup: Bool = false
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State var deviceLinkModel: DeviceLinkModel?
-    let bluetoothScanner = BluetoothScanner(timeoutSeconds: 120, notifyMinIntervalMillis: 1000)
-    @State var availableDevices = [BluetoothDeviceModel]()
+    // TODO: debounce by group
+    @State var deviceLinkModel = OptionalModel<DeviceLinkModel>()
+    let bluetoothScanner: BluetoothScanner
+    @State var bluetoothDebouncer: Debouncer<MonitoredPeripheral>
+    @Debounced(interval: 2.0) var availableDevices = [BluetoothDeviceModel]()
 
-    @State var linkedDeviceRSSIRawSamples = [Tuple2<Date, Double>]()
-    @State var linkedDeviceRSSISmoothedSamples = [Tuple2<Date, Double>]()
-    @State var linkedDeviceDistanceSamples = [Tuple2<Date, Double>]()
-    var smoothingFunc = KalmanFilter(initialState: 0, initialCovariance: 0.01, processNoise: 0.1, measurementNoise: 5.01)
+    @Debounced(interval: 2.0) var linkedDeviceRSSIRawSamples = [Tuple2<Date, Double>]()
+    @Debounced(interval: 2.0) var linkedDeviceRSSISmoothedSamples = [Tuple2<Date, Double>]()
+    @Debounced(interval: 2.0) var linkedDeviceDistanceSamples = [Tuple2<Date, Double>]()
+    var smoothingFunc = KalmanFilter(initialState: 0, initialCovariance: 2.01, processNoise: 0.1, measurementNoise: 5.01)
 
     @AppStorage("applicationStorage") var applicationStorage = ApplicationStorage()
     @Environment(\.scenePhase) var scenePhase
@@ -37,6 +40,10 @@ struct TooFarDidntLockApp: App {
     
     @State var isScreenLocked = false
 
+    init() {
+        bluetoothScanner = BluetoothScanner(timeToLive: 120)
+        bluetoothDebouncer = Debouncer(debounceInterval: 2, wrapping: bluetoothScanner)
+    }
     
     var body: some Scene {
         // This window gets hidden, but we need a place to attach handlers
@@ -52,27 +59,30 @@ struct TooFarDidntLockApp: App {
                     // TODO
                     guard !isCooldownActive else { return }
                     guard !isSafetyActive else { return }
-                    guard let link = deviceLinkModel else { return }
+                    guard let link = deviceLinkModel.value else { return }
                     
                     let now = Date.now
                     let maxAgeSeconds: Double? = link.idleTimeout
 
                     var age: Double?
                     var distance: Double?
-                    if let peripheral = bluetoothScanner.peripherals.first{$0.peripheral.identifier == link.uuid && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)} {
+                    let peripheral = bluetoothScanner.peripherals.first{$0.peripheral.identifier == link.uuid && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)}
+                    if let peripheral = peripheral  {
                         age = peripheral.lastSeenAt.distance(to: now)
                         
-                        if let rssi = linkedDeviceRSSISmoothedSamples.last?.b {
-                            distance = rssiDistance(referenceAtOneMeter: link.referencePower, current: rssi)
+                        if let d = linkedDeviceDistanceSamples.last {
+                            distance = d.second
                         }
                     }
                     if let maxAgeSeconds = maxAgeSeconds {
                         switch age {
-                        case .some(let x) where x < maxAgeSeconds/2.0:
+                        case .some(let age) where age < maxAgeSeconds*0.75:
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")
-                        case .some(let x) where x >= maxAgeSeconds/2.0:
+                        case .some(let age) where age >= maxAgeSeconds*0.75:
+                            logger.debug("Worry \(age) > \(maxAgeSeconds*0.75)")
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Worry")
-                        case .some(let x) where x > maxAgeSeconds:
+                        case .some(let age) where age > maxAgeSeconds:
+                            logger.debug("Dizzy \(age) > \(maxAgeSeconds)")
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
                         case .none:
                             appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Dizzy")
@@ -85,23 +95,19 @@ struct TooFarDidntLockApp: App {
                     if distance ?? 0 > link.maxDistance {
                         shouldLock = true
                     }
+                    if link.requireConnection && !(peripheral?.peripheral.isConnected ?? false) {
+                        shouldLock = true
+                    }
                     
                     if shouldLock {
-                        let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_NOW)
-                        let sym = dlsym(handle, "SACLockScreenImmediate")
-                        let SACLockScreenImmediate = unsafeBitCast(sym, to: (@convention(c) () -> Int32).self)
-
-                        logger.info("would lock \(distance ?? -1) > \(link.maxDistance)")
-                        appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_XX")
-                        if lockingEnabled {
-                            let _ = SACLockScreenImmediate()
-                        }
+                        logger.info("Would lock; distance=\(distance ?? -1) > \(link.maxDistance); disconnected=\(link.requireConnection && !(peripheral?.peripheral.isConnected ?? false))")
+                        doLock()
                     }
                     
                 }
-                .onChange(of: deviceLinkModel, initial: false) { (old, new) in
+                .onChange(of: deviceLinkModel, initial: false) { old, new in
 //                    guard old. != new else { return }
-                    if let newValue = new {
+                    if let newValue = new.value {
                         applicationStorage.deviceLink = DeviceLinkStorage(
                             uuid: newValue.uuid.uuidString,
                             deviceDetails: BluetoothDeviceDetailsStorage(
@@ -111,34 +117,49 @@ struct TooFarDidntLockApp: App {
                             ),
                             referencePower: newValue.referencePower,
                             maxDistance: newValue.maxDistance,
-                            idleTimeout: newValue.idleTimeout
+                            idleTimeout: newValue.idleTimeout,
+                            requireConnection: newValue.requireConnection
                         )
-                        if old?.uuid != new?.uuid {
+                        if old.value?.uuid != newValue.uuid || old.value?.requireConnection != newValue.requireConnection {
+                            if let oldValue = old.value {
+                                bluetoothScanner.disconnect(uuid: oldValue.uuid)
+                            }
                             smoothingFunc.state = newValue.deviceDetails.rssi
+                            if newValue.requireConnection {
+                                if bluetoothScanner.connect(uuid: newValue.uuid) == nil {
+                                    logger.info("deviceLinkModel.change: device not found on connect()")
+                                }
+                            }
                         }
                     } else {
                         applicationStorage.deviceLink = nil
                     }
                 }
                 .onChange(of: applicationStorage, initial: true) { (old, new) in
-                    logger.debug("applicationStorage changed")
+                    // logger.debug("applicationStorage changed")
                     if let link = new.deviceLink,
                        let uuid = UUID(uuidString: link.uuid) {
-                        deviceLinkModel = DeviceLinkModel(
+                        deviceLinkModel.value = DeviceLinkModel(
                             uuid: uuid,
                             deviceDetails: BluetoothDeviceModel(
                                 uuid: uuid,
                                 name: link.deviceDetails.name,
                                 rssi: link.deviceDetails.rssi,
-                                lastSeenAt: Date.now),
+                                lastSeenAt: Date.now,
+                                isConnected: self.deviceLinkModel.value?.deviceDetails.isConnected ?? false
+                            ),
                             referencePower: link.referencePower,
                             maxDistance: link.maxDistance,
-                            idleTimeout: link.idleTimeout
+                            idleTimeout: link.idleTimeout,
+                            requireConnection: link.requireConnection
                         )
                     }
                 }
-                .onReceive(bluetoothScanner) { peripherals in
-                    onBluetoothScannerUpdate(peripherals)
+                .onReceive(bluetoothScanner) { peripheral in
+                    onBluetoothScannerUpdate(peripheral)
+                }
+                .onReceive(bluetoothScanner.didDisconnect) { uuid in
+                    onBluetoothDidDisconnect(uuid)
                 }
                 .onReceive(appDelegate.statusBarDelegate.willShow) { _ in
                     appDelegate.statusBarDelegate.setItemVisible(tag: 1, visible: isSafetyActive)
@@ -168,15 +189,29 @@ struct TooFarDidntLockApp: App {
                 }
         }
         Settings {
-            SettingsView(deviceLinkModel: $deviceLinkModel, 
+            SettingsView(deviceLinkModel: $deviceLinkModel,
                          availableDevices: $availableDevices,
                          linkedDeviceRSSIRawSamples: $linkedDeviceRSSIRawSamples,
                          linkedDeviceRSSISmoothedSamples: $linkedDeviceRSSISmoothedSamples,
                          linkedDeviceDistanceSamples: $linkedDeviceDistanceSamples,
+//                         linkedDeviceRSSIRawSamples: $linkedDeviceRSSIRawSamples,
+//                         linkedDeviceRSSISmoothedSamples: $linkedDeviceRSSISmoothedSamples,
+//                         linkedDeviceDistanceSamples: $linkedDeviceDistanceSamples,
                          safetyPeriodSeconds: $safetyPeriodSeconds,
                          cooldownPeriodSeconds: $cooldownPeriodSeconds)
             .environmentObject(EnvVar<Bool>($launchAtStartup.wrappedValue))
 //            .environmentObject(EnvVar<Bool>($requireDeviceFound.wrappedValue))
+        }
+    }
+
+    func doLock() {
+        let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_NOW)
+        let sym = dlsym(handle, "SACLockScreenImmediate")
+        let SACLockScreenImmediate = unsafeBitCast(sym, to: (@convention(c) () -> Int32).self)
+
+        appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_XX")
+        if lockingEnabled {
+            let _ = SACLockScreenImmediate()
         }
     }
         
@@ -244,54 +279,74 @@ struct TooFarDidntLockApp: App {
         self.cooldownPeriodTimer.stop()
     }
     
-    func onBluetoothScannerUpdate(_ updates: [MonitoredPeripheral]) {
-        for update in updates {
-            if let index = availableDevices.firstIndex(where: {$0.uuid == update.peripheral.identifier }) {
-                var device = availableDevices[index]
-                device.name = update.peripheral.name
-                device.rssi = update.lastSeenRSSI
-                device.lastSeenAt = update.lastSeenAt
-                availableDevices[index] = device
-            } else {
-                var device = BluetoothDeviceModel(
-                    uuid: update.peripheral.identifier,
-                    name: update.peripheral.name,
-                    rssi: update.lastSeenRSSI,
-                    txPower: update.txPower,
-                    lastSeenAt: update.lastSeenAt)
-                availableDevices.append(device)
-            }
+    func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
+        if let index = availableDevices.firstIndex(where: {$0.uuid == update.peripheral.identifier }) {
+            var device = availableDevices[index]
+            device.name = update.peripheral.name
+            device.rssi = update.lastSeenRSSI
+            device.lastSeenAt = update.lastSeenAt
+            availableDevices[index] = device
+        } else {
+            let device = BluetoothDeviceModel(
+                uuid: update.peripheral.identifier,
+                name: update.peripheral.name,
+                rssi: update.lastSeenRSSI,
+                txPower: update.txPower,
+                lastSeenAt: update.lastSeenAt,
+                isConnected: update.peripheral.isConnected
+            )
+            availableDevices.append(device)
         }
         availableDevices.sort(by: { (lhs, rhs) in
-                switch (lhs.name, rhs.name) {
-                case (nil, nil):
-                    return lhs.uuid < rhs.uuid
-                case (nil, _):
-                    return false
-                case (_, nil):
-                    return true
-                default:
-                    return lhs.name! < rhs.name!
-                }
-            })
+            if lhs.uuid == deviceLinkModel.value?.uuid {
+                return true
+            }
+            if rhs.uuid == deviceLinkModel.value?.uuid {
+                return false
+            }
+            switch (lhs.name, rhs.name) {
+            case (nil, nil):
+                return lhs.uuid < rhs.uuid
+            case (nil, _):
+                return false
+            case (_, nil):
+                return true
+            default:
+                return lhs.name! < rhs.name!
+            }
+        })
 
-        if let linked = updates.first(where: {$0.peripheral.identifier == deviceLinkModel?.uuid}) {
+//        for linked in updates.filter({$0.peripheral.identifier == deviceLinkModel.value?.uuid}) {
+//        if let linked = updates.first(where: {$0.peripheral.identifier == deviceLinkModel.value?.uuid}) {
+        if update.peripheral.identifier == deviceLinkModel.value?.uuid {
+            let linked = update
             func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
                 return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
             }
             
+            // TODO: are deviceLinkModel and updates necessarily synched at this point? I guess not...
+            
+            let device = deviceLinkModel.value!
+            
 //            let linkedDeviceRSSISmoothedSample = (linkedDeviceRSSIRawSamples.lastNSeconds(seconds: 20).map{$0.b}.suffix(1000).average() + linked.lastSeenRSSI) / 2.0
             let linkedDeviceRSSISmoothedSample = smoothingFunc.update(measurement: linkedDeviceRSSIRawSamples.last?.b ?? 0)
 
-            linkedDeviceRSSIRawSamples.append(Tuple2(linked.lastSeenAt, linked.lastSeenRSSI))
-            linkedDeviceRSSIRawSamples = tail(linkedDeviceRSSIRawSamples)
+            linkedDeviceRSSIRawSamples = tail(linkedDeviceRSSIRawSamples + [Tuple2(linked.lastSeenAt, linked.lastSeenRSSI)])
+
+            linkedDeviceRSSISmoothedSamples = tail(linkedDeviceRSSISmoothedSamples + [Tuple2(linked.lastSeenAt, linkedDeviceRSSISmoothedSample)])
             
-            linkedDeviceRSSISmoothedSamples.append(Tuple2(linked.lastSeenAt, linkedDeviceRSSISmoothedSample))
-            linkedDeviceRSSISmoothedSamples = tail(linkedDeviceRSSISmoothedSamples)
-            
-            linkedDeviceDistanceSamples.append(Tuple2(linked.lastSeenAt, rssiDistance(referenceAtOneMeter: deviceLinkModel!.referencePower, current: linkedDeviceRSSISmoothedSample)))
-            linkedDeviceDistanceSamples = tail(linkedDeviceDistanceSamples)
+            linkedDeviceDistanceSamples = tail(linkedDeviceDistanceSamples + [Tuple2(linked.lastSeenAt, rssiDistance(referenceAtOneMeter: deviceLinkModel.value!.referencePower, current: linkedDeviceRSSISmoothedSample))])
+
+            if device.requireConnection {
+                if bluetoothScanner.connect(uuid: device.uuid) == nil {
+                    logger.info("onBluetoothScannerUpdate: device not found on connect()")
+                }
+            }
         }
+    }
+    func onBluetoothDidDisconnect(_ uuid: UUID) {
+        logger.info("disconnected")
+        doLock()
     }
 }
 

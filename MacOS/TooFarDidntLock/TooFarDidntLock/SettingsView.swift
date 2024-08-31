@@ -98,7 +98,7 @@ struct LabeledDoubleSlider: View {
 struct SettingsView: View {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "Settings")
 
-    @Binding var deviceLinkModel: DeviceLinkModel?
+    @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
     @Binding var availableDevices: [BluetoothDeviceModel]
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
@@ -185,7 +185,7 @@ struct GeneralSettingsView: View {
 struct BluetoothSettingsView: View {
     let logger = Logger(subsystem: "TooFarDidntLock", category: "Settings")
 
-    @Binding var deviceLinkModel: DeviceLinkModel?
+    @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
     @Binding var availableDevices: [BluetoothDeviceModel]
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
@@ -323,7 +323,7 @@ struct DeviceMonitorView: View {
         case distance
     }
 
-    @Binding var deviceLinkModel: DeviceLinkModel?
+    @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceDistanceSamples: [Tuple2<Date, Double>]
@@ -467,7 +467,7 @@ extension Array where Element == Tuple2<Date, Double> {
 struct DeviceLinkSettingsView: View {
     @Environment(\.scenePhase) var scenePhase
     
-    @Binding var deviceLinkModel: DeviceLinkModel?
+    @Binding var deviceLinkModel: OptionalModel<DeviceLinkModel>
     @Binding var availableDevices: [BluetoothDeviceModel]
     @Binding var linkedDeviceRSSIRawSamples: [Tuple2<Date, Double>]
     @Binding var linkedDeviceRSSISmoothedSamples: [Tuple2<Date, Double>]
@@ -475,8 +475,9 @@ struct DeviceLinkSettingsView: View {
 
     @State var linkedDeviceId: UUID?
     @State var linkedDeviceReferencePower: Double = 0
-    @State var linkedDeviceMaxDistance: Double = 0
+    @State var linkedDeviceMaxDistance: Double = 1
     @State var linkedDeviceIdleTimeout: Double = 10
+    @State var linkedDeviceRequireConnection: Bool = false
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -485,7 +486,7 @@ struct DeviceLinkSettingsView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading) {
                         HStack {
-                            let linkedDevice = deviceLinkModel?.deviceDetails
+                            let linkedDevice = deviceLinkModel.value?.deviceDetails
                             DeviceView(
                                 uuid: Binding.constant(linkedDevice?.uuid.uuidString),
                                 name: Binding.constant(linkedDevice?.name),
@@ -499,8 +500,8 @@ struct DeviceLinkSettingsView: View {
                             Text("Reference Power")
                             Slider(value: $linkedDeviceReferencePower, in: -100...0)
                             .onChange(of: linkedDeviceReferencePower) {
-                                if let _ = deviceLinkModel {
-                                    deviceLinkModel?.referencePower = linkedDeviceReferencePower
+                                if let _ = deviceLinkModel.value {
+                                    deviceLinkModel.value?.referencePower = linkedDeviceReferencePower
                                 }
                             }
                             Text("\(String(format: "%.0f", linkedDeviceReferencePower))")
@@ -509,8 +510,8 @@ struct DeviceLinkSettingsView: View {
                             Text("Max distance")
                             Slider(value: $linkedDeviceMaxDistance, in: 0.0...9.0, step: 0.25)
                             .onChange(of: linkedDeviceMaxDistance) {
-                                if let _ = deviceLinkModel {
-                                    deviceLinkModel?.maxDistance = linkedDeviceMaxDistance
+                                if let _ = deviceLinkModel.value {
+                                    deviceLinkModel.value?.maxDistance = linkedDeviceMaxDistance
                                 }
                             }
                             Text("\(String(format: "%.2f", linkedDeviceMaxDistance))")
@@ -520,15 +521,21 @@ struct DeviceLinkSettingsView: View {
                             Slider(value: $linkedDeviceIdleTimeout, in: 0...10*60, step: 10)
                             .onChange(of: linkedDeviceIdleTimeout) {
                                 let a = deviceLinkModel
-                                let b = deviceLinkModel?.idleTimeout
+                                let b = deviceLinkModel.value?.idleTimeout
                                 let c = linkedDeviceIdleTimeout
-                                if let _ = deviceLinkModel {
-                                    deviceLinkModel?.idleTimeout = linkedDeviceIdleTimeout
+                                if let _ = deviceLinkModel.value {
+                                    deviceLinkModel.value?.idleTimeout = linkedDeviceIdleTimeout
                                     deviceLinkModel = deviceLinkModel
                                 }
                             }
                             Text("\(formatMinSec(msec: linkedDeviceIdleTimeout))")
                         }
+                        Toggle("Require connection", isOn: $linkedDeviceRequireConnection)
+                            .onChange(of: linkedDeviceRequireConnection) {
+                                if let _ = deviceLinkModel.value {
+                                    deviceLinkModel.value?.requireConnection = linkedDeviceRequireConnection
+                                }
+                            }
                     }
                     
                     DeviceMonitorView(
@@ -545,21 +552,21 @@ struct DeviceLinkSettingsView: View {
                 }
             }
         }
+        // TODO: move into controller code
         .onChange(of: availableDevices) {
-            if let linkedDevice = deviceLinkModel?.deviceDetails,
+            if let linkedDevice = deviceLinkModel.value?.deviceDetails,
                let listedDevice = availableDevices.first(where: {$0.uuid == linkedDevice.uuid}) {
-                deviceLinkModel?.deviceDetails = listedDevice
+                deviceLinkModel.value?.deviceDetails = listedDevice
             }
         }
-        .onAppear {
-        }
-        .onChange(of: scenePhase) { (old, new) in
+        .onChange(of: scenePhase, initial: true) { (old, new) in
             guard new == .active else { return }
-            if let deviceLinkModel = deviceLinkModel {
+            if let deviceLinkModel = deviceLinkModel.value {
                 self.linkedDeviceId = deviceLinkModel.uuid
                 self.linkedDeviceReferencePower = deviceLinkModel.referencePower
                 self.linkedDeviceMaxDistance = deviceLinkModel.maxDistance
                 self.linkedDeviceIdleTimeout = deviceLinkModel.idleTimeout ?? 0
+                self.linkedDeviceRequireConnection = deviceLinkModel.requireConnection
                 
             }
         }
@@ -571,17 +578,19 @@ struct DeviceLinkSettingsView: View {
                 _ = provider.loadObject(ofClass: NSString.self) { object, _ in
                     if let uuidString = object as? String {
                         if let device = availableDevices.first(where: {$0.uuid.uuidString == uuidString}) {
+                            // todo, i dont think dispatch was required here
                             DispatchQueue.main.async {
                                 self.linkedDeviceId = device.uuid
                                 self.linkedDeviceReferencePower = device.rssi
                                 self.linkedDeviceMaxDistance = device.rssi
 
-                                self.deviceLinkModel = DeviceLinkModel(
+                                self.deviceLinkModel.value = DeviceLinkModel(
                                     uuid: device.uuid,
                                     deviceDetails: device,
                                     referencePower: device.rssi,
                                     maxDistance: linkedDeviceMaxDistance,
-                                    idleTimeout: linkedDeviceIdleTimeout
+                                    idleTimeout: linkedDeviceIdleTimeout,
+                                    requireConnection: linkedDeviceRequireConnection
                                 )
                             }
                         }

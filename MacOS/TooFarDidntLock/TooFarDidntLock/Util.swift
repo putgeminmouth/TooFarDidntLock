@@ -36,3 +36,13 @@ struct Tuple2<A: Equatable, B: Equatable>: Equatable {
         self.b = b
     }
 }
+
+extension Array {
+    mutating func updateOrAppend(update: () -> Element, where predicate: (Element) throws -> Bool) rethrows {
+        if let index = try self.firstIndex(where: predicate) {
+            self[index] = update()
+        } else {
+            self.append(update())
+        }
+    }
+}
