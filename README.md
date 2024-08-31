@@ -1,7 +1,7 @@
 # Too Far; Didn't Lock
 Automatically lock your computer when you leave it unattended.
 
-![logo](docs/logo.png)
+![logo](docs/logo_128.png)
 
 Configure various conditions under which your computer should auto-lock:
 * when a selected Bluetooth device goes out of range
