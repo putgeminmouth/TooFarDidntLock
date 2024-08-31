@@ -185,7 +185,7 @@ struct TooFarDidntLockApp: App {
     func maybeLock() {
         let activeZones = Set(domainModel.zones.filter{zoneEvaluator.isActive($0)}.map{$0.id})
         let activeZoneLinks = domainModel.links.filter {activeZones.contains($0.zoneId)}
-        let activeLinkStates = activeZoneLinks.flatMap{a in runtimeModel.linkStates.first{$0.id == a.id}}
+        let activeLinkStates = activeZoneLinks.compactMap{a in runtimeModel.linkStates.first{$0.id == a.id}}
         let broken = activeLinkStates.filter{$0.state == .unlinked}
         guard broken.count > 0
         else {

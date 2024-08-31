@@ -240,7 +240,6 @@ struct BluetoothLinkSettingsView: View {
         let bluetoothLinkModel = bluetoothLinkModel.value
         let linkedDevice = runtimeModel.bluetoothStates.first{$0.id == bluetoothLinkModel?.deviceId}
         let linkState = runtimeModel.linkStates.first{$0.id == bluetoothLinkModel?.id}.map{$0 as! BluetoothLinkState}
-        let availableDevices = runtimeModel.bluetoothStates
         let linkedZone: Binding<UUID?> = bindOpt(self.$bluetoothLinkModel,
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
@@ -370,7 +369,6 @@ struct EditBluetoothDeviceLinkModal: View {
         let page = itemBeingEdited.value == nil ? "1" : "2"
 
         VStack(alignment: .leading) {
-            let data = domainModel.links
             VStack(alignment: .leading) {
                 if page == "1" {
                     GroupBox("Select a device to link") {
