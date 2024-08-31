@@ -49,7 +49,6 @@ struct TooFarDidntLockApp: App {
         // This window gets hidden, but we need a place to attach handlers
         Window("Too Far; Didn't Lock", id: "DummyWindowToProcessEvents") {
             EmptyView()
-                .frame(width: 0, height: 0	)
                 .onReceive(cooldownPeriodTimer) { time in
                     stopCooldownPeriod();
                 }
@@ -219,6 +218,7 @@ struct TooFarDidntLockApp: App {
         logger.debug("onStart")
 
         let window = NSApp.windows.first(where: {$0.identifier?.rawValue == "DummyWindowToProcessEvents"})
+        window?.alphaValue = 0
         window?.orderOut(nil)
 
         let dnc = DistributedNotificationCenter.default()
