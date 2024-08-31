@@ -250,118 +250,80 @@ struct BluetoothLinkSettingsView: View {
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
         VStack(alignment: .leading) {
-            GroupBox(label: Label("Linked device", systemImage: "")) {
-                HStack(alignment: .top) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading) {
                     VStack(alignment: .leading) {
-                        VStack(alignment: .leading) {
-                            ZoneSelectionView(
-                                selectionCanStartNil: linkedZone,
-                                nilMenuText: "Choose a Zone"
-                            )
-                            BluetoothDeviceView(
-                                uuid: Binding.constant(linkedDevice?.id.uuidString),
-                                name: Binding.constant(linkedDevice?.name),
-                                rssi: Binding.constant(linkedDevice?.lastSeenRSSI),
-                                lastSeenAt: Binding.constant(linkedDevice?.lastSeenAt))
-                                .padding(4)
-                                .border(Color.gray, width: 1)
-                                .cornerRadius(2)
-                        }
-                        LabeledDoubleSlider(
-                            label: "Reference Power",
-                            description: "Set to the signal power at 1 meter.",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.referencePower ?? 0.0},
-                                           {$0.value!.referencePower=$1}),
-                            in: -100...0, 
-                            format: {"\(Int($0))"})
-                        LabeledDoubleSlider(
-                            label: "Environmental noise",
-                            description: "TODO",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.environmentalNoise ?? 0.0},
-                                           {$0.value!.environmentalNoise=$1}),
-                            in: 0...100,
-                            format: {"\(Int($0))"})
-                        LabeledDoubleSlider(
-                            label: "Max distance",
-                            description: "The distance in meters at which the device is considered absent, resulting in a screen lock. It is calculated from the current signal strength and the reference power, and is not very stable or reliable. It is recommended to consider anything less than 5m as close, and anything more as far.",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.maxDistance ?? 0.0},
-                                           {$0.value!.maxDistance=$1}),
-                            in: 0.0...9.0, step: 0.25, format: {"\(String(format: "%.2f", $0))"})
-                        LabeledDoubleSlider(
-                            label: "Idle timeout",
-                            description: "Device is considered absent if not found for too long, resulting in a screen lock. Unless you configure an active connection, both the host and target device will scan / broadcast at intervals that may vary e.g. due to low power settings. It is recommended to set at least 10-30 seconds.",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.idleTimeout ?? 0.0},
-                                           {$0.value!.idleTimeout=$1}),
-                            in: 0...10*60, step: 10, format: {formatMinSec(msec: $0)})
-                        HStack {
-                            LabeledView(
-                                label: "Require connection",
-                                horizontal: true,
-                                description: "When active, the app will attempt to maintain a bluetooth connection to the device, reconnecting as necessary. If the connection fails, the screen will lock.") {
-                                    Toggle("", isOn: bindOpt($bluetoothLinkModel,
-                                                             {$0?.requireConnection ?? false},
-                                                             {$0.value!.requireConnection=$1}))
-                                }
-                            Spacer()
-                            Image(systemName: (linkedDevice?.connectionState != .disconnected) ? "cable.connector" : "cable.connector.slash")
-                                .colorMultiply(bluetoothLinkModel?.requireConnection == true ? .white : .gray)
-                        }
-                    }
-                    
-                    if let monitor = monitor {
-                        BluetoothDeviceMonitorView(
-                            monitorData: Binding.constant(monitor.data)
+                        ZoneSelectionView(
+                            selectionCanStartNil: linkedZone,
+                            nilMenuText: "Choose a Zone"
                         )
+                        BluetoothDeviceView(
+                            uuid: Binding.constant(linkedDevice?.id.uuidString),
+                            name: Binding.constant(linkedDevice?.name),
+                            rssi: Binding.constant(linkedDevice?.lastSeenRSSI),
+                            lastSeenAt: Binding.constant(linkedDevice?.lastSeenAt))
+                        .padding(4)
+                        .border(Color.gray, width: 1)
+                        .cornerRadius(2)
+                    }
+                    LabeledDoubleSlider(
+                        label: "Reference Power",
+                        description: "Set to the signal power at 1 meter.",
+                        value: bindOpt($bluetoothLinkModel,
+                                       {$0?.referencePower ?? 0.0},
+                                       {$0.value!.referencePower=$1}),
+                        in: -100...0,
+                        format: {"\(Int($0))"})
+                    LabeledDoubleSlider(
+                        label: "Environmental noise",
+                        description: "TODO",
+                        value: bindOpt($bluetoothLinkModel,
+                                       {$0?.environmentalNoise ?? 0.0},
+                                       {$0.value!.environmentalNoise=$1}),
+                        in: 0...100,
+                        format: {"\(Int($0))"})
+                    LabeledDoubleSlider(
+                        label: "Max distance",
+                        description: "The distance in meters at which the device is considered absent, resulting in a screen lock. It is calculated from the current signal strength and the reference power, and is not very stable or reliable. It is recommended to consider anything less than 5m as close, and anything more as far.",
+                        value: bindOpt($bluetoothLinkModel,
+                                       {$0?.maxDistance ?? 0.0},
+                                       {$0.value!.maxDistance=$1}),
+                        in: 0.0...9.0, step: 0.25, format: {"\(String(format: "%.2f", $0))"})
+                    LabeledDoubleSlider(
+                        label: "Idle timeout",
+                        description: "Device is considered absent if not found for too long, resulting in a screen lock. Unless you configure an active connection, both the host and target device will scan / broadcast at intervals that may vary e.g. due to low power settings. It is recommended to set at least 10-30 seconds.",
+                        value: bindOpt($bluetoothLinkModel,
+                                       {$0?.idleTimeout ?? 0.0},
+                                       {$0.value!.idleTimeout=$1}),
+                        in: 0...10*60, step: 10, format: {formatMinSec(msec: $0)})
+                    HStack {
+                        LabeledView(
+                            label: "Require connection",
+                            horizontal: true,
+                            description: "When active, the app will attempt to maintain a bluetooth connection to the device, reconnecting as necessary. If the connection fails, the screen will lock.") {
+                                Toggle("", isOn: bindOpt($bluetoothLinkModel,
+                                                         {$0?.requireConnection ?? false},
+                                                         {$0.value!.requireConnection=$1}))
+                            }
+                        Spacer()
+                        Image(systemName: (linkedDevice?.connectionState != .disconnected) ? "cable.connector" : "cable.connector.slash")
+                            .colorMultiply(bluetoothLinkModel?.requireConnection == true ? .white : .gray)
                     }
                 }
-                .frame(maxWidth: /*@START_MENU_TOKEN@*/.infinity/*@END_MENU_TOKEN@*/, alignment: .leading)
-                .onDrop(of: ["public.text"], isTargeted: nil) { providers in
-                    self.onDeviceLinkDrop(providers)
-                    return true
+                
+                if let monitor = monitor {
+                    BluetoothDeviceMonitorView(
+                        monitorData: Binding.constant(monitor.data)
+                    )
                 }
             }
+            .frame(maxWidth: /*@START_MENU_TOKEN@*/.infinity/*@END_MENU_TOKEN@*/, alignment: .leading)            
         }
         .onAppear() {
             monitor = bluetoothMonitor.startMonitoring(bluetoothLinkModel!.deviceId)
         }
         .onChange(of: bluetoothLinkModel?.environmentalNoise ?? 0) { (old, new) in
             monitor?.data.smoothingFunc?.processNoise = new
-        }
-    }
-    
-    func onDeviceLinkDrop(_ providers: [NSItemProvider]) {
-        for provider in providers {
-            if provider.canLoadObject(ofClass: NSString.self) {
-                _ = provider.loadObject(ofClass: NSString.self) { object, _ in
-                    if let uuidString = object as? String,
-                       let deviceId = UUID(uuidString: uuidString) {
-                        if let state = runtimeModel.bluetoothStates.first{$0.id == deviceId} {
-
-                            let bluetoothLink = BluetoothLinkModel(
-                                id: UUID(),
-                                zoneId: (domainModel.zones.first?.id)!,
-                                deviceId: deviceId,
-                                referencePower: state.lastSeenRSSI,
-                                environmentalNoise: 0,
-                                maxDistance: 1.0,
-                                idleTimeout: 10,
-                                requireConnection: false
-                            )
-                            // drop happens on some ItemProvider thread
-                            DispatchQueue.main.async {
-                                domainModel.links.append(bluetoothLink)
-//                                domainModel.links = [bluetoothLink]
-                                bluetoothLinkModel.value = bluetoothLink
-                                domainModel.wellKnownBluetoothDevices.updateOrAppend(state, where: {$0.id == deviceId})
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }

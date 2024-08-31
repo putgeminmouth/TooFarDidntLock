@@ -79,6 +79,7 @@ struct LinksSettingsView: View {
                 Spacer()
                 
                 Button {
+                    itemBeingEdited.value = nil
                     newItemTypeIsPresented = true
                 } label: {
                     Image(systemName: "plus")
