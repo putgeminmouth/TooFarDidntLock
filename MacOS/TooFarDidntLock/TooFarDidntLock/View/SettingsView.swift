@@ -28,25 +28,26 @@ struct SettingsView: View {
                 .blur(radius: 20)
                 .opacity(0.080)
 
-            ATabView {
-                ATab("General", image: Icons.settings.toImage()) {
+            TabView {[
+                .tab(label: "General", icon: Icons.settings.toImage()) {
                     GeneralSettingsView(
                         launchAtStartup: $launchAtStartup,
                         showSettingsAtStartup: $showSettingsAtStartup,
                         showInDock: $showInDock,
                         safetyPeriodSeconds: $safetyPeriodSeconds,
                         cooldownPeriodSeconds: $cooldownPeriodSeconds)
-                }
-                ATab("Zones", image: Icons.zone.toImage()) {
-                    ZoneSettingsView()
-                }
-                ATab("Links", image: Icons.link.toImage()) {
+                },
+                .tab(label: "Links", icon: Icons.link.toImage()) {
                     LinksSettingsView()
-                }
-                ATab("Bluetooth", image: Icons.bluetooth.toImage()) {
+                },
+                .tab(label: "Zones", icon: Icons.zone.toImage()) {
+                    ZoneSettingsView()
+                },
+                .divider,
+                .tab(label: "Bluetooth", icon: Icons.bluetooth.toImage()) {
                     BluetoothSettingsView()
                 }
-            }
+            ]}
         }
         
     }
