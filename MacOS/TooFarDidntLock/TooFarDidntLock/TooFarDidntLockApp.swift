@@ -155,6 +155,13 @@ struct TooFarDidntLockApp: App {
                     self.onApplicationDidFinishLaunching()
                 }
         }
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About TooFar; Didn't Lock") {
+                    appDelegate.statusBarDelegate.showAboutPanel()
+                }
+            }
+        }
         Settings {
             SettingsView(
                          launchAtStartup: $launchAtStartup,
