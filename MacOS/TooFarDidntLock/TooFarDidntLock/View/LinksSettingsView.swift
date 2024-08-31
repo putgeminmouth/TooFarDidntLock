@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LinksSettingsView: View {
     @EnvironmentObject var domainModel: DomainModel
-    @EnvironmentObject var runtimeModel: RuntimeModel
 
     @State var zoneIdFilter: UUID? = nil
     @State var modalIsPresented = false
@@ -25,7 +24,7 @@ struct LinksSettingsView: View {
                 .filter{zoneIdFilter == nil || $0.zoneId == zoneIdFilter}
                 .map{ model in
                     let zone = domainModel.zones.first{$0.id == model.zoneId}
-                    let device = runtimeModel.bluetoothStates.first{$0.id == model.deviceId}
+                    let device = domainModel.wellKnownBluetoothDevices.first{$0.id == model.deviceId}
                     return (id: model.id, model: model, zone: zone, device: device)
                 }
             let maxZoneNameWidth = data.compactMap{$0.zone?.name}.map{estimateTextSize(text: $0).width}.max() ?? 0

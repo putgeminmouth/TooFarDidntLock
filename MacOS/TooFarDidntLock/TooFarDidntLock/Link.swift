@@ -99,10 +99,11 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
     }
     
     func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
-        // update well-known: even really worth doing? seems unlikely to ever change, and we already capture it initially
+        // update well-known: we only do this for infrequently updated properties
+        // that are important for display purposes, like name
         if let index = domainModel.wellKnownBluetoothDevices.firstIndex{$0.id == update.id } {
             let known = domainModel.wellKnownBluetoothDevices[index]
-            // not critical but avoid spam-updating due to current signal etc
+            // RSSI and such deliberately ignored
             if known.name != update.name ||
                 known.txPower != update.txPower {
                 domainModel.wellKnownBluetoothDevices[index] = update

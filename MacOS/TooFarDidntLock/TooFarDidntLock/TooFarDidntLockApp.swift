@@ -183,6 +183,7 @@ struct TooFarDidntLockApp: App {
             .environmentObject(zoneEvaluator)
             .environmentObject(domainModel)
             .environmentObject(runtimeModel)
+            .environmentObject(NotObserved(runtimeModel))
             .environmentObject(bluetoothMonitor)
         }
     }

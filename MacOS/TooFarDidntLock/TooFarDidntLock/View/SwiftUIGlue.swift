@@ -73,6 +73,13 @@ import Combine
 //    }
 //}
 //
+class NotObserved<A>: ObservableObject {
+    var value: A
+    init(_ value: A) {
+        self.value = value
+    }
+}
+
 struct OptionalModel<A: Equatable>: Equatable {
     static func == (lhs: OptionalModel<A>, rhs: OptionalModel<A>) -> Bool {
         return lhs.value == rhs.value

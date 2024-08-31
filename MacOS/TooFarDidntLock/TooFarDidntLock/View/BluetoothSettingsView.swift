@@ -9,7 +9,6 @@ struct BluetoothSettingsView: View {
 
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
-    @EnvironmentObject var runtimeModel: RuntimeModel
     @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
 
     let emptyUUID = UUID()
@@ -21,7 +20,7 @@ struct BluetoothSettingsView: View {
             AvailableBluetoothDevicesSettingsView(selectedId: bindOpt($selectedId, UUID()))
             if let monitorData = selectedMonitor?.data {
                 BluetoothDeviceMonitorView(
-                    monitorData: Binding.constant(monitorData)
+                    monitorData: monitorData
                 )
                 .frame(minHeight: 200)
             } else {
@@ -96,9 +95,6 @@ struct BluetoothDevicesListView: View {
     
 }
 struct AvailableBluetoothDevicesSettingsView: View {
-
-    @EnvironmentObject var runtimeModel: RuntimeModel
-
     @AppStorage("uipref.bluetooth.showOnlyNamedDevices") var showOnlyNamedDevices: Bool = true
     
     @Binding var selectedId: UUID
@@ -132,7 +128,7 @@ struct BluetoothDeviceMonitorView: View {
         case distance
     }
 
-    @Binding var monitorData: BluetoothMonitorData
+    @State var monitorData: BluetoothMonitorData
     @State var availableChartTypes = [ChartType]()
     @State var linkedDeviceChartType: ChartType = .distance
     
@@ -141,7 +137,7 @@ struct BluetoothDeviceMonitorView: View {
     @State var chartTypeAdjustedYMax: Double = 0
     @State var chartTypeAdjustedYLastUpdated = Date()
 
-    var body: some View {        
+    var body: some View {
         VStack(alignment: .leading) {
             Picker(selection: $linkedDeviceChartType, label: EmptyView()) {
                 ForEach(availableChartTypes, id: \.self) { type in
@@ -161,7 +157,7 @@ struct BluetoothDeviceMonitorView: View {
                 yAxisMin: $chartTypeAdjustedYMin,
                 yAxisMax: $chartTypeAdjustedYMax)
         }
-        .onChange(of: monitorData.rssiRawSamples, initial: true) {
+        .onReceive(monitorData.objectWillChange) { _ in
             recalculate()
             if chartTypeAdjustedSamples.count < 3 {
                 let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSamples)
@@ -232,7 +228,7 @@ struct BluetoothDeviceMonitorView: View {
 struct BluetoothLinkSettingsView: View {
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
-    @EnvironmentObject var runtimeModel: RuntimeModel
+    @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
     @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
 
     // TODO: i think this is optional because its easier to pass the binding?
@@ -241,11 +237,13 @@ struct BluetoothLinkSettingsView: View {
     // We use a dedicated monitor in this view instead of the link's or another existing monitor
     // because we want the view to react live without impact to changes in the view without having to save
     @State var monitor: BluetoothMonitor.Monitored?
+    
+    @State var linkedLastSeenRSSI: Double?
+    @State var linkedLastSeenAt: Date?
 
     var body: some View {
         let bluetoothLinkModel = bluetoothLinkModel.value
-        let linkedDevice = runtimeModel.bluetoothStates.first{$0.id == bluetoothLinkModel?.deviceId}
-        let linkState = runtimeModel.linkStates.first{$0.id == bluetoothLinkModel?.id}.map{$0 as! BluetoothLinkState}
+        let linkedDevice = domainModel.wellKnownBluetoothDevices.first{$0.id == bluetoothLinkModel?.deviceId}
         let linkedZone: Binding<UUID?> = bindOpt(self.$bluetoothLinkModel,
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
@@ -260,11 +258,19 @@ struct BluetoothLinkSettingsView: View {
                         BluetoothDeviceView(
                             uuid: Binding.constant(linkedDevice?.id.uuidString),
                             name: Binding.constant(linkedDevice?.name),
-                            rssi: Binding.constant(linkedDevice?.lastSeenRSSI),
-                            lastSeenAt: Binding.constant(linkedDevice?.lastSeenAt))
+                            rssi: $linkedLastSeenRSSI,
+                            lastSeenAt: $linkedLastSeenAt)
                         .padding(4)
                         .border(Color.gray, width: 1)
                         .cornerRadius(2)
+                        // likely unnecessary optimization: we avoid binding the entire view to runtimeModel
+                        // and only update these props. elsewhere we use the cached model
+                        .onReceive(runtimeModel.value.objectWillChange) { _ in
+                            if let state = runtimeModel.value.bluetoothStates.first{$0.id == bluetoothLinkModel?.deviceId} {
+                                linkedLastSeenRSSI = state.lastSeenRSSI
+                                linkedLastSeenAt = state.lastSeenAt
+                            }
+                        }
                     }
                     LabeledDoubleSlider(
                         label: "Reference Power",
@@ -313,7 +319,7 @@ struct BluetoothLinkSettingsView: View {
                 
                 if let monitor = monitor {
                     BluetoothDeviceMonitorView(
-                        monitorData: Binding.constant(monitor.data)
+                        monitorData: monitor.data
                     )
                 }
             }
@@ -331,7 +337,7 @@ struct BluetoothLinkSettingsView: View {
 struct EditBluetoothDeviceLinkModal: View {
     
     @EnvironmentObject var domainModel: DomainModel
-    @EnvironmentObject var runtimeModel: RuntimeModel
+    @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
 
     let zoneId: UUID
     @State var itemBeingEdited = OptionalModel<BluetoothLinkModel>(value: nil)
@@ -343,7 +349,7 @@ struct EditBluetoothDeviceLinkModal: View {
         self.zoneId = zoneId
         self.onDismiss = onDismiss
 
-        // other forms of init break swifui, and no updates happen...
+        // using State() like this is not recommended but other forms of init break swifui, and no updates happen...
         self._itemBeingEdited = State(wrappedValue: OptionalModel(value: initialValue))
     }
     
@@ -356,7 +362,7 @@ struct EditBluetoothDeviceLinkModal: View {
                     GroupBox("Select a device to link") {
                         BluetoothDevicesListView(selectedId: bindOpt($selectedDeviceId, UUID()), showOnlyNamedDevices: Binding.constant(true))
                             .onChange(of: selectedDeviceId) {
-                                guard let selectedDevice = runtimeModel.bluetoothStates.first(where: {$0.id == selectedDeviceId})
+                                guard let selectedDevice = runtimeModel.value.bluetoothStates.first(where: {$0.id == selectedDeviceId})
                                 else { return }
                                 itemBeingEdited.value = BluetoothLinkModel(
                                     id: UUID(),
