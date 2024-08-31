@@ -1,19 +1,78 @@
+// https://www.reddit.com/r/swift/comments/154edey/new_to_swiftui_how_exactly_does_binding_and/
+
 import SwiftUI
 import OSLog
 import Combine
-
-class EnvVar<B: Equatable>: Equatable, ObservableObject {
-    static func == (lhs: EnvVar<B>, rhs: EnvVar<B>) -> Bool {
-        return lhs.wrappedValue == rhs.wrappedValue
-    }
-    
-    @Published var wrappedValue: B
-
-    init(_ value: B) {
-        self.wrappedValue = value
-    }
-}
-
+//
+//class EnvVar<B: Equatable, Group>: Equatable, ObservableObject {
+//    static func == (lhs: EnvVar<B, Group>, rhs: EnvVar<B, Group>) -> Bool {
+//        return lhs.wrappedValue == rhs.wrappedValue
+//    }
+//    
+//    private let get: () -> B
+//    private let set: (B) -> Void
+//    
+//    var wrappedValue: B {
+//        get { self.get() }
+//        set {
+//            self.set(newValue)
+//            self.objectWillChange.send()
+//        }
+//    }
+//
+//    init(get: @escaping () -> B, set: @escaping (B) -> Void) {
+//        self.get = get
+//        self.set = set
+//    }
+//}
+//
+//class EnvBinding<B: Equatable, Identifier>: Equatable, ObservableObject {
+//    static func == (lhs: EnvBinding<B, Identifier>, rhs: EnvBinding<B, Identifier>) -> Bool {
+//        return lhs.binding.wrappedValue == rhs.binding.wrappedValue
+//    }
+//    
+//    @Published var binding: Binding<B>
+//    
+//    var wrappedValue: B { binding.wrappedValue }
+//    var projectedValue: Binding<B> { binding }
+//
+//    init(_ binding: Binding<B>) {
+//        self.binding = binding
+//    }
+//}
+//
+//protocol EnvRegistryValue<T>: AnyObject {
+//    associatedtype T
+//}
+//
+//struct EnvBindingRegistry {
+//    static var registry = NSMapTable<NSString, AnyObject>.strongToWeakObjects()
+//    
+//    static func register<T>(name: String, binding: any EnvRegistryValue<T>) {
+//        registry.setObject(binding, forKey: name as NSString)
+//    }
+//    static func get<T>(name: String) -> any EnvRegistryValue<T> {
+//        return registry.object(forKey: name as NSString) as! any EnvRegistryValue<T>
+//    }
+//}
+//@propertyWrapper
+//class AppStorageEnv<T>: ObservableObject, DynamicProperty {
+//    private var value: AppStorage<T>
+//    
+//    var wrappedValue: T {
+//        get { value.wrappedValue }
+//        set {
+//            value.wrappedValue = newValue
+//        }
+//    }
+//    
+//    var projectedValue: Binding<T> { value.projectedValue }
+//
+//    init(wrappedValue: T, _ name: String) where T == Bool {
+//        self.value = AppStorage(wrappedValue: wrappedValue, name)
+//    }
+//}
+//
 struct OptionalModel<A: Equatable>: Equatable {
     var value: A? = nil
 }
