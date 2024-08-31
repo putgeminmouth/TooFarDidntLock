@@ -27,9 +27,9 @@ struct ATabView: View {
     let tabs: [ATab]
     @State private var selectedTab = 0
     
-    init(@ViewBuilder _ content: @escaping () -> TupleView<(ATab, ATab)>) {
-        let (c1,c2) = content().value
-        self.tabs = [c1, c2]
+    init(@ViewBuilder _ content: @escaping () -> TupleView<(ATab, ATab, ATab)>) {
+        let (c1,c2, c3) = content().value
+        self.tabs = [c1, c2, c3]
     }
 
     var body: some View {

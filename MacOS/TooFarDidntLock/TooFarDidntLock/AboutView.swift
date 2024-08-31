@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import OSLog
 
 struct AboutView: View {
-    let logger = Logger(subsystem: "TooFarDidntLock", category: "About")
+    let logger = Log.Logger("AboutView")
     var body: some View {
         VStack {
             Image("AboutImage")
