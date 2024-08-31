@@ -2,19 +2,6 @@ import SwiftUI
 import OSLog
 import CoreWLAN
 
-struct Icons {
-    static let zone = "mappin.and.ellipse"
-    struct Zones {
-        static let manual = "lightswitch.on"
-        static let wifi = "wifi"
-        static func of(_ zone: any Zone) -> String {
-            if zone is ManualZone { return manual }
-            if zone is WifiZone { return wifi }
-            return ""
-        }
-    }
-}
-
 struct ActiveIcon: View {
     @Binding var active: Bool
     
@@ -55,7 +42,7 @@ struct ManualZoneMenuItemView: View {
     @Binding var zone: ManualZone
     var body: some View {
         HStack {
-            Image(systemName: Icons.Zones.manual)
+            Icons.Zones.manual.toImage()
             Text("\(zone.name)")
         }
     }
@@ -67,7 +54,7 @@ struct WifiZoneMenuItemView: View {
     @Binding var zone: WifiZone
     var body: some View {
         HStack {
-            Image(systemName: Icons.Zones.wifi)
+            Icons.Zones.wifi.toImage()
             Text("\(zone.name)")
         }
     }
@@ -96,7 +83,7 @@ struct ManualZoneListItemView: View {
     @Binding var zone: ManualZone
     var body: some View {
         HStack {
-            Image(systemName: Icons.Zones.manual)
+            Icons.Zones.manual.toImage()
                 .help("Manual")
                 .frame(minWidth: 20)
                 .padding(3)
@@ -118,7 +105,7 @@ struct WifiZoneListItemView: View {
     @Binding var zone: WifiZone
     var body: some View {
         HStack {
-            Image(systemName: Icons.Zones.wifi)
+            Icons.Zones.wifi.toImage()
                 .help("Wifi")
                 .frame(minWidth: 20)
                 .padding(3)
@@ -272,26 +259,22 @@ struct ZoneSettingsView: View {
     var body: some View {
         VStack(alignment: .leading) {
             let _ = itemBeingEdited
-            ForEach($domainModel.zones, id: \.id) { zone in
-                VStack(alignment: .leading) {
-                    HStack {
-                        ZoneListItemView(zone: zone)
-                        
-                        Spacer()
-                        
-                        Button("", systemImage: "trash") {
-                            if domainModel.zones.count > 1, let index = domainModel.zones.firstIndex{$0.id == zone.wrappedValue.id} {
-                                domainModel.zones.remove(at: index)
-                            }
-                        }.buttonStyle(PlainButtonStyle())
-                            .disabled(domainModel.zones.count <= 1)
-                            .help(domainModel.zones.count <= 1 ? "Must have at least one Zone" : "")
-                    }
+            ListView($domainModel.zones, id: \.wrappedValue.id) { zone in
+                HStack {
+                    ZoneListItemView(zone: zone)
+                    
+                    Spacer()
+                    
+                    Button("", systemImage: "trash") {
+                        if domainModel.zones.count > 1, let index = domainModel.zones.firstIndex{$0.id == zone.wrappedValue.id} {
+                            domainModel.zones.remove(at: index)
+                        }
+                    }.buttonStyle(PlainButtonStyle())
+                        .disabled(domainModel.zones.count <= 1)
+                        .help(domainModel.zones.count <= 1 ? "Must have at least one Zone" : "")
                 }
-                .background(hover == zone.wrappedValue.id ? Color.gray.opacity(0.3) : Color.clear)
-                .onHover { hovering in
-                    self.hover = hovering ? zone.wrappedValue.id : nil
-                }
+                .padding([.leading, .trailing], 3)
+                .padding([.top, .bottom], 3)
                 .onTapGesture(count: 2) {
                     itemBeingEdited = zone.wrappedValue
                     editIsPresented = true
@@ -327,23 +310,35 @@ struct ZoneSettingsView: View {
             HStack {
                 Spacer()
                 
-                Button("", systemImage: "plus") {
+                Button {
                     newItemTypeIsPresented = true
+                } label: {
+                    Image(systemName: "plus")
+                        .myButtonLabelStyle()
                 }
-                .buttonStyle(PlainButtonStyle())
+                .myButtonStyle()
+
                 .popover(isPresented: $newItemTypeIsPresented) {
                     VStack(alignment: .leading) {
-                        Button("Manual", systemImage: Icons.Zones.manual) {
+                        Button {
                             newItemIsPresented = true
                             itemBeingEdited = newZone("Manual")!
+                        } label: {
+                            Label(title: {Text("Manual")}, icon: {Icons.Zones.manual.toImage()})
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .myButtonLabelStyle()
                         }
-                            .buttonStyle(PlainButtonStyle())
+                            .myButtonStyle()
                             .padding(1)
-                        Button("Wifi", systemImage: Icons.Zones.wifi) {
+                       Button {
                             newItemIsPresented = true
                             itemBeingEdited = newZone("Wifi")!
-                        }
-                            .buttonStyle(PlainButtonStyle())
+                       } label: {
+                           Label(title: {Text("Wifi")}, icon: {Icons.Zones.wifi.toImage()})
+                               .frame(maxWidth: .infinity, alignment: .leading)
+                               .myButtonLabelStyle()
+                       }
+                            .myButtonStyle()
                             .padding(1)
                     }.padding(7)
                 }.sheet(isPresented: $newItemIsPresented) {

@@ -27,9 +27,9 @@ struct ATabView: View {
     let tabs: [ATab]
     @State private var selectedTab = 0
     
-    init(@ViewBuilder _ content: @escaping () -> TupleView<(ATab, ATab, ATab)>) {
-        let (c1,c2, c3) = content().value
-        self.tabs = [c1, c2, c3]
+    init(@ViewBuilder _ content: @escaping () -> TupleView<(ATab, ATab, ATab, ATab)>) {
+        let (c1,c2, c3, c4) = content().value
+        self.tabs = [c1, c2, c3, c4]
     }
 
     var body: some View {
@@ -54,13 +54,17 @@ struct ATabView: View {
             }
             .padding()
 
-            ScrollView {
-                ZStack {
-                    tabs[selectedTab].content
-                        .padding()
-                }
+            // setting the scrollview to match heigh is important, otherwise
+            // some views won't properly calcualte, e.g. List
+            GeometryReader { g in
+                ScrollView {
+                    ZStack {
+                        tabs[selectedTab].content
+                            .padding()
+                    }.frame(width: g.size.width, height: g.size.height, alignment: .top)
+                }.frame(width: g.size.width, height: g.size.height)
             }
-            Spacer()
+            Spacer() // needed?
         }
     }
 }

@@ -93,7 +93,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
     }
     
     func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
-        // update well-known: even really worth doing? seems unlikely to ever change
+        // update well-known: even really worth doing? seems unlikely to ever change, and we already capture it initially
         if let index = domainModel.wellKnownBluetoothDevices.firstIndex{$0.id == update.id } {
             let known = domainModel.wellKnownBluetoothDevices[index]
             // not critical but avoid spam-updating due to current signal etc
@@ -110,8 +110,15 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             runtimeModel.bluetoothStates.append(update)
         }
         
-        // remember linked-to devices. this is mainly for display purposes since the scan can take a while to pick up a device
         for var link in domainModel.links {
+            // remember/cache linked-to devices. this is mainly for display purposes since the scan can
+            // take a while to pick up a device or it may not currently be available
+            if domainModel.wellKnownBluetoothDevices.first{$0.id == link.deviceId} == nil,
+            let known = runtimeModel.bluetoothStates.first{$0.id == link.deviceId} {
+                domainModel.wellKnownBluetoothDevices.append(known)
+            }
+
+            // conversely, ensure any cached devices are in the runtime list if they were not picked up by the scanner
             if runtimeModel.bluetoothStates.first{$0.id == link.deviceId} == nil,
             let known = domainModel.wellKnownBluetoothDevices.first{$0.id == link.deviceId} {
                 runtimeModel.bluetoothStates.append(known)
@@ -124,12 +131,12 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let rhsId = rhs.id
             let rhsName = rhs.name
             
-            if domainModel.links.contains{$0.deviceId == lhsId} {
-                return true
-            }
-            if domainModel.links.contains{$0.deviceId == rhsId} {
-                return false
-            }
+//            if domainModel.links.contains{$0.deviceId == lhsId} {
+//                return true
+//            }
+//            if domainModel.links.contains{$0.deviceId == rhsId} {
+//                return false
+//            }
             switch (lhsName, rhsName) {
             case (nil, nil):
                 return lhsId < rhsId
