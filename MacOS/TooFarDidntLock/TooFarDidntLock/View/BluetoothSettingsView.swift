@@ -206,6 +206,11 @@ struct BluetoothDeviceMonitorView: View {
         chartTypeAdjustedYMax = max(sampleMax, chartTypeAdjustedYMax)
     }
     func recalculate() {
+        if monitorData.distanceSmoothedSamples != nil {
+            availableChartTypes = ChartType.allCases
+        } else {
+            availableChartTypes = ChartType.allCases.filter{$0 != .distance}
+        }
         switch linkedDeviceChartType {
         case .rssiRaw:
             let samples = monitorData.rssiRawSamples
@@ -327,6 +332,11 @@ struct BluetoothLinkSettingsView: View {
         }
         .onAppear() {
             monitor = bluetoothMonitor.startMonitoring(bluetoothLinkModel!.deviceId)
+            monitor!.data.referenceRSSIAtOneMeter = bluetoothLinkModel!.referencePower
+            monitor!.data.distanceSmoothedSamples = []
+        }
+        .onChange(of: bluetoothLinkModel?.referencePower ?? 0) { (old, new) in
+            monitor?.data.referenceRSSIAtOneMeter = new
         }
         .onChange(of: bluetoothLinkModel?.environmentalNoise ?? 0) { (old, new) in
             monitor?.data.smoothingFunc?.processNoise = new
