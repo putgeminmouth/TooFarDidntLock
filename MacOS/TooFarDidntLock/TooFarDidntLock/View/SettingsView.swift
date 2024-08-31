@@ -77,8 +77,8 @@ struct GeneralSettingsView: View {
                 value: $safetyPeriodSeconds, in: 0...900, step: 30, format: {formatMinSec(msec: $0)})
             LabeledIntSlider(
                 label: "Cooldown period",
-                description: "Prevents locking again too quickly each time the screen is unlocked. This can happen depending on your environment or configuration.",
-                value: $cooldownPeriodSeconds, in: 0...500, step: 10, format: {formatMinSec(msec: $0)})
+                description: "Prevents locking again too quickly each time the screen is unlocked in order to avoid getting permanently locked out.",
+                value: $cooldownPeriodSeconds, in: 30...500, step: 10, format: {formatMinSec(msec: $0)})
 
         }
         .navigationTitle("Settings: Too Far; Didn't Lock")

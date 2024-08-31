@@ -139,7 +139,8 @@ class BluetoothScanner: NSObject, CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         let existing = monitoredPeripherals[peripheral.identifier]
         
-        if existing == nil {
+        // only log named peripherals because it gets pretty spammy
+        if existing == nil && peripheral.name != nil {
             logger.debug("Discovered \(peripheral.identifier); name=\(peripheral.name ?? "")")
         }
         

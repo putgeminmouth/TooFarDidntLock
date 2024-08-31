@@ -43,7 +43,6 @@ struct TooFarDidntLockApp: App {
     @State var menuIconFrame = 0
     
     @State var isScreenLocked = false
-    @State var isAppLocked = false
     
     init() {
         bluetoothScanner = BluetoothScanner(timeToLive: 120)
@@ -79,6 +78,12 @@ struct TooFarDidntLockApp: App {
                 }
                 .onReceive(safetyPeriodTimer) { time in
                     stopSafetyPeriod()
+                }
+                .onChange(of: lockingEnabled) {
+                    // check again in case a link entered a lock state during the period
+                    // since we may not get another signal. for now i avoid a "just in case" poll.
+                    // TODO: is it really desirable to immediately lock when the user changes this?
+                    maybeLock()
                 }
                 .onReceive(bluetoothLinkEvaluator.linkStateDidChange.eraseToAnyPublisher()) { _ in
                     maybeLock()
@@ -183,6 +188,8 @@ struct TooFarDidntLockApp: App {
     }
 
     func maybeLock() {
+        guard !isSafetyActive else { return }
+        guard !isCooldownActive else { return }
         let activeZones = Set(domainModel.zones.filter{zoneEvaluator.isActive($0)}.map{$0.id})
         let activeZoneLinks = domainModel.links.filter {activeZones.contains($0.zoneId)}
         let activeLinkStates = activeZoneLinks.compactMap{a in runtimeModel.linkStates.first{$0.id == a.id}}
@@ -196,11 +203,10 @@ struct TooFarDidntLockApp: App {
         doLock()
     }
     func doLock() {
-        guard !isAppLocked
+        guard !isScreenLocked
         else { return }
-        isAppLocked = true
         
-        let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_NOW)
+        let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/login", RTLD_NOW)
         let sym = dlsym(handle, "SACLockScreenImmediate")
         let SACLockScreenImmediate = unsafeBitCast(sym, to: (@convention(c) () -> Int32).self)
 
@@ -210,9 +216,8 @@ struct TooFarDidntLockApp: App {
         }
     }
     func doUnLock() {
-        guard isAppLocked
+        guard isScreenLocked
         else { return }
-        isAppLocked = false
         
         appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")
     }
@@ -271,6 +276,10 @@ struct TooFarDidntLockApp: App {
         safetyPeriodTimer.stop()
         
         appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral", tooltip: "")
+        
+        // check again in case a link entered a lock state during the period
+        // since we may not get another signal. for now i avoid a "just in case" poll.
+        maybeLock()
     }
     
     func startCooldownPeriod() {
@@ -287,6 +296,10 @@ struct TooFarDidntLockApp: App {
 
         self.isCooldownActive = false
         self.cooldownPeriodTimer.stop()
+
+        // check again in case a link entered a lock state during the period
+        // since we may not get another signal. for now i avoid a "just in case" poll.
+        maybeLock()
     }
 }
 
