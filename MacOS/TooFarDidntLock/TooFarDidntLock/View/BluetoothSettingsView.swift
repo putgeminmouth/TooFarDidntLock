@@ -22,6 +22,8 @@ struct BluetoothSettingsView: View {
                 BluetoothDeviceMonitorView(
                     monitorData: monitorData
                 )
+                // we want to force the view to recreate when changing data
+                .id(ObjectIdentifier(monitorData))
                 .frame(minHeight: 200)
             } else {
                 Text("Select a device")
@@ -31,10 +33,19 @@ struct BluetoothSettingsView: View {
         }
         .onChange(of: selectedId ?? emptyUUID) { (old, new) in
             if old != emptyUUID {
+                selectedMonitor?.cancellable.cancel()
                 selectedMonitor = nil
             }
             if new != emptyUUID {
                 selectedMonitor = bluetoothMonitor.startMonitoring(new)
+
+                // just for the UX, backfill with existing data
+                if let data = bluetoothMonitor.dataFor(deviceId: new).first,
+                   let firstSample = data.rssiRawSamples.first?.b {
+                    selectedMonitor!.data.rssiRawSamples = data.rssiRawSamples
+                    selectedMonitor!.data.smoothingFunc = BluetoothMonitor.initSmoothingFunc(initialRSSI: firstSample)
+                    BluetoothMonitor.recalculate(monitorData: selectedMonitor!.data)
+                }
             }
         }
     }
@@ -87,8 +98,10 @@ struct BluetoothDevicesListView: View {
             }
             if let callback = callback {
                 callback(AnyView(row), device)
+                    .allowsHitTesting(false) // don't let Text() and stuff prevent list selection
             } else {
                 row
+                    .allowsHitTesting(false) // don't let Text() and stuff prevent list selection
             }
         }
     }
@@ -358,9 +371,9 @@ struct BluetoothLinkSettingsView: View {
                     initialRSSI: monitor!.data.rssiRawSamples.first?.b ?? bluetoothLinkModel.referencePower,
                     processNoise: bluetoothLinkModel.environmentalNoise
                 )
-            }
 
-            BluetoothMonitor.recalculate(monitorData: monitor!.data)
+                BluetoothMonitor.recalculate(monitorData: monitor!.data)
+            }
         } else {
             let linkState = runtimeModel.value.linkStates.first{$0.id == bluetoothLinkModel.id} as! BluetoothLinkState
             monitor!.data.rssiRawSamples = linkState.monitorData.data.rssiRawSamples
