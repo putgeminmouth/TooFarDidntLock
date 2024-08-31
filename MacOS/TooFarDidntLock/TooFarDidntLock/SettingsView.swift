@@ -25,6 +25,7 @@ struct LabeledView<Content: View>: View {
     @State var label: String
     @State var horizontal: Bool = true
     @State var description: String?
+    @State var descriptionShowing: Bool = false
     let content: Content
     
     init(label: String, horizontal: Bool, description: String? = nil, @ViewBuilder _ content: @escaping () -> Content) {
@@ -35,28 +36,38 @@ struct LabeledView<Content: View>: View {
     }
 
     var body: some View {
+        let info = Image(systemName: description != nil ? "info.circle" : "")
+            .frame(width: 0, height: 0)
+            .onTapGesture {
+                descriptionShowing.toggle()
+            }
+            .popover(isPresented: $descriptionShowing) {
+                HStack(alignment: .top) {
+                    Text(description!)
+                        .frame(width: 200)
+//                                    .fixedSize(horizontal: true, vertical: true)
+//                                    .lineLimit(nil)
+//                        .fixedSize(horizontal: true, vertical: true)
+//                        .padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
+                }
+                .padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
+//                .frame(maxHeight: 300)
+            }
         VStack(alignment: .leading) {
             if horizontal {
                 HStack(alignment: .top) {
                     Text(label)
+                    info
                     content
                 }
             } else {
                 VStack(alignment: .leading) {
                     Text(label)
+                    info
                     content
                 }
             }
-            if let description {
-                HStack() {
-                    Text(description)
-                        .fontWidth(.condensed)
-                        .fontWeight(.light)
-                        .italic()
-                }.padding(EdgeInsets(top: 0, leading: 30, bottom: 0, trailing: 0))
-            }
         }
-
     }
 }
 
@@ -167,11 +178,11 @@ struct GeneralSettingsView: View {
                 }
             LabeledIntSlider(
                 label: "Safety period",
-                description: "Auto locking is disabled for a while on launch to prevent lockout if the app is bugged",
+                description: "When the app starts up, locking is disabled for a while. This provides a safety window to make sure you can't get permanently locked out.",
                 value: $safetyPeriodSeconds, in: 0...900, step: 30, format: {formatMinSec(msec: $0)})
             LabeledIntSlider(
                 label: "Cooldown period",
-                description: "When the screen is unlocked, wait a while before activating again.",
+                description: "Prevents locking again too quickly each time the screen is unlocked. This can happen depending on your environment or configuration.",
                 value: $cooldownPeriodSeconds, in: 0...500, step: 10, format: {formatMinSec(msec: $0)})
 
         }
@@ -511,7 +522,7 @@ struct DeviceLinkSettingsView: View {
                         }
                         LabeledDoubleSlider(
                             label: "Max distance",
-                            description: "Device is considered absent if moved too far away.",
+                            description: "The distance in meters at which the device is considered absent, resulting in a screen lock. It is calculated from the current signal strength and the reference power, and is not very stable or reliable. It is recommended to consider anything less than 5m as close, and anything more as far.",
                             value: $linkedDeviceMaxDistance, in: 0.0...9.0, step: 0.25, format: {"\(String(format: "%.2f", $0))"})
                         .onChange(of: linkedDeviceMaxDistance) {
                             if let _ = deviceLinkModel.value {
@@ -520,7 +531,7 @@ struct DeviceLinkSettingsView: View {
                         }
                         LabeledDoubleSlider(
                             label: "Idle timeout",
-                            description: "Device is considered absent if not found for too long.",
+                            description: "Device is considered absent if not found for too long, resulting in a screen lock. Unless you configure an active connection, both the host and target device will scan / broadcast at intervals that may vary e.g. due to low power settings. It is recommended to set at least 10-30 seconds.",
                             value: $linkedDeviceIdleTimeout, in: 0...10*60, step: 10, format: {formatMinSec(msec: $0)})
                         .onChange(of: linkedDeviceIdleTimeout) {
                             if let _ = deviceLinkModel.value {
@@ -528,12 +539,17 @@ struct DeviceLinkSettingsView: View {
                                 deviceLinkModel = deviceLinkModel
                             }
                         }
-                        Toggle("Require connection", isOn: $linkedDeviceRequireConnection)
-                            .onChange(of: linkedDeviceRequireConnection) {
-                                if let _ = deviceLinkModel.value {
-                                    deviceLinkModel.value?.requireConnection = linkedDeviceRequireConnection
-                                }
-                            }
+                        LabeledView(
+                            label: "Require connection",
+                            horizontal: true,
+                            description: "When active, the app will attempt to maintain a bluetooth connection to the device, reconnecting as necessary. If the connection fails, the screen will lock.") {
+                                Toggle("", isOn: $linkedDeviceRequireConnection)
+                                    .onChange(of: linkedDeviceRequireConnection) {
+                                        if let _ = deviceLinkModel.value {
+                                            deviceLinkModel.value?.requireConnection = linkedDeviceRequireConnection
+                                        }
+                                    }
+                        }
                     }
                     
                     DeviceMonitorView(
