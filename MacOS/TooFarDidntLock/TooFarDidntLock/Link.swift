@@ -244,3 +244,74 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         }
     }
 }
+
+class WifiLinkEvaluator: BaseLinkEvaluator {
+    let logger = Log.Logger("WifiLinkEvaluator")
+
+    let wifiScanner: WifiScanner
+    let wifiMonitor: WifiMonitor
+    // TODO: don't do this blocking call on .main
+    let updateTimer = Timed().start(interval: 1)
+    init(
+        domainModel: DomainModel, runtimeModel: RuntimeModel,
+        wifiScanner: WifiScanner,
+        wifiMonitor: WifiMonitor
+    ) {
+        self.wifiScanner = wifiScanner
+        self.wifiMonitor = wifiMonitor
+        super.init(domainModel: domainModel, runtimeModel: runtimeModel)
+        wifiScanner.didUpdate
+            .sink(receiveValue: self.onWifiScannerUpdates)
+            .store(in: &cancellables)
+    }
+    
+    func onWifiScannerUpdates(_ updates: [MonitoredWifiDevice]) {
+        for update in updates {
+            onWifiScannerUpdate(update)
+        }
+    }
+    
+    func onWifiScannerUpdate(_ update: MonitoredWifiDevice) {
+        // update well-known: we only do this for infrequently updated properties
+        // that are important for display purposes, like name
+        if let index = domainModel.wellKnownWifiDevices.firstIndex{$0.bssid == update.bssid } {
+            let known = domainModel.wellKnownWifiDevices[index]
+            // RSSI and such deliberately ignored
+            if known.ssid != update.ssid ||
+                known.noiseMeasurement != update.noiseMeasurement {
+                domainModel.wellKnownWifiDevices[index] = update
+            }
+        }
+        
+        // the main sync from CoreBT to domain
+        if let index = runtimeModel.wifiStates.firstIndex{$0.bssid == update.bssid } {
+            runtimeModel.wifiStates[index] = update
+        } else {
+            runtimeModel.wifiStates.append(update)
+        }
+
+        runtimeModel.wifiStates.sort(by: { (lhs, rhs) in
+            let lhsId = lhs.bssid
+            let lhsName = lhs.ssid.map{$0.lowercased()}
+            let rhsId = rhs.bssid
+            let rhsName = rhs.ssid.map{$0.lowercased()}
+            
+//            if domainModel.links.contains{$0.deviceId == lhsId} {
+//                return true
+//            }
+//            if domainModel.links.contains{$0.deviceId == rhsId} {
+//                return false
+//            }
+            switch (lhsName, rhsName) {
+            case (nil, nil):
+                return lhsId < rhsId
+            case (nil, _):
+                return false
+            case (_, nil):
+                return true
+            default:
+                return lhsName! < rhsName!
+            }
+        })
+    }
+}

@@ -8,11 +8,13 @@ class Timed: Cancellable, Publisher {
     private let notifier = PassthroughSubject<Output, Failure>()
     private var publisher: Timer.TimerPublisher?
     private var interval: TimeInterval?
+    private var dispatch: RunLoop
     private var sink: Cancellable?
     private var cancellable: Cancellable?
     
-    init(interval: TimeInterval?) {
+    init(interval: TimeInterval?, dispatch: RunLoop? = nil) {
         self.interval = interval
+        self.dispatch = dispatch ?? .main // TODO: no default
     }
     convenience init() {
         self.init(interval: nil)
@@ -39,7 +41,8 @@ class Timed: Cancellable, Publisher {
         assert((interval ?? self.interval) != nil)
         let itv = (interval ?? self.interval)!
         self.interval = itv
-        self.publisher = Timer.publish(every: itv, tolerance: nil, on: .main, in: .common)
+        // TODO: we don't always want to on main, e.g. blocking call to fetch wifi
+        self.publisher = Timer.publish(every: itv, tolerance: nil, on: dispatch, in: .common)
         self.sink = self.publisher?.sink(receiveCompletion: {self.notifier.send(completion: $0)}, receiveValue: {self.notifier.send($0)})
         self.cancellable = publisher?.connect()
         return self

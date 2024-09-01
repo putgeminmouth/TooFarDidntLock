@@ -3,11 +3,30 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		03311BAF2C6F80160058F1B2 /* Link.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03311BAE2C6F80120058F1B2 /* Link.swift */; };
+		0338E8A72C83B8710063A435 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0338E8A22C83B8710063A435 /* README.md */; };
+		0338E8A82C83B8710063A435 /* ZoneModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8A52C83B8710063A435 /* ZoneModel.swift */; };
+		0338E8A92C83B8710063A435 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8A12C83B8710063A435 /* Model.swift */; };
+		0338E8AA2C83B8710063A435 /* DeviceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E89F2C83B8710063A435 /* DeviceModel.swift */; };
+		0338E8AB2C83B8710063A435 /* BluetoothModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E89E2C83B8710063A435 /* BluetoothModel.swift */; };
+		0338E8AC2C83B8710063A435 /* LinkModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8A02C83B8710063A435 /* LinkModel.swift */; };
+		0338E8AD2C83B8710063A435 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8A32C83B8710063A435 /* Storage.swift */; };
+		0338E8AE2C83B8710063A435 /* WifiModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8A42C83B8710063A435 /* WifiModel.swift */; };
+		0338E8BB2C83B8810063A435 /* BluetoothSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8AF2C83B8810063A435 /* BluetoothSettingsView.swift */; };
+		0338E8BC2C83B8810063A435 /* WifiSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B72C83B8810063A435 /* WifiSettingsView.swift */; };
+		0338E8BD2C83B8810063A435 /* TabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B62C83B8810063A435 /* TabView.swift */; };
+		0338E8BE2C83B8810063A435 /* MiscViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B32C83B8810063A435 /* MiscViews.swift */; };
+		0338E8BF2C83B8810063A435 /* LinksSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B12C83B8810063A435 /* LinksSettingsView.swift */; };
+		0338E8C02C83B8810063A435 /* Icons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B02C83B8810063A435 /* Icons.swift */; };
+		0338E8C12C83B8810063A435 /* SwiftUIGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B52C83B8810063A435 /* SwiftUIGlue.swift */; };
+		0338E8C22C83B8810063A435 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B42C83B8810063A435 /* SettingsView.swift */; };
+		0338E8C32C83B8810063A435 /* ListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B22C83B8810063A435 /* ListView.swift */; };
+		0338E8C42C83B8810063A435 /* ZoneSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B82C83B8810063A435 /* ZoneSelectionView.swift */; };
+		0338E8C52C83B8810063A435 /* ZoneSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0338E8B92C83B8810063A435 /* ZoneSettingsView.swift */; };
 		037339DB2C493D2200C1EF0B /* Util.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037339DA2C493D1E00C1EF0B /* Util.swift */; };
 		0398B3C22C5FA2FB0089DFD6 /* Wifi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0398B3C12C5FA2FB0089DFD6 /* Wifi.swift */; };
 		0398B3C62C679FBB0089DFD6 /* Zone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0398B3C52C679FB70089DFD6 /* Zone.swift */; };
@@ -21,7 +40,6 @@
 		03B947F82C30869F00E75D5E /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947F72C30869F00E75D5E /* AboutView.swift */; };
 		03B947FB2C31B93700E75D5E /* Bluetooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B947FA2C31B93700E75D5E /* Bluetooth.swift */; };
 		03CF7CED2C3B5B2500AC39E7 /* Timed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CF7CEC2C3B5B2500AC39E7 /* Timed.swift */; };
-		03D4E6BA2C363E9C0016FC6B /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D4E6B92C363E9C0016FC6B /* Model.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,6 +61,25 @@
 
 /* Begin PBXFileReference section */
 		03311BAE2C6F80120058F1B2 /* Link.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Link.swift; sourceTree = "<group>"; };
+		0338E89E2C83B8710063A435 /* BluetoothModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothModel.swift; sourceTree = "<group>"; };
+		0338E89F2C83B8710063A435 /* DeviceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceModel.swift; sourceTree = "<group>"; };
+		0338E8A02C83B8710063A435 /* LinkModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkModel.swift; sourceTree = "<group>"; };
+		0338E8A12C83B8710063A435 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
+		0338E8A22C83B8710063A435 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		0338E8A32C83B8710063A435 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
+		0338E8A42C83B8710063A435 /* WifiModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WifiModel.swift; sourceTree = "<group>"; };
+		0338E8A52C83B8710063A435 /* ZoneModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoneModel.swift; sourceTree = "<group>"; };
+		0338E8AF2C83B8810063A435 /* BluetoothSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothSettingsView.swift; sourceTree = "<group>"; };
+		0338E8B02C83B8810063A435 /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
+		0338E8B12C83B8810063A435 /* LinksSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinksSettingsView.swift; sourceTree = "<group>"; };
+		0338E8B22C83B8810063A435 /* ListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListView.swift; sourceTree = "<group>"; };
+		0338E8B32C83B8810063A435 /* MiscViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiscViews.swift; sourceTree = "<group>"; };
+		0338E8B42C83B8810063A435 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		0338E8B52C83B8810063A435 /* SwiftUIGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftUIGlue.swift; sourceTree = "<group>"; };
+		0338E8B62C83B8810063A435 /* TabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabView.swift; sourceTree = "<group>"; };
+		0338E8B72C83B8810063A435 /* WifiSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WifiSettingsView.swift; sourceTree = "<group>"; };
+		0338E8B82C83B8810063A435 /* ZoneSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoneSelectionView.swift; sourceTree = "<group>"; };
+		0338E8B92C83B8810063A435 /* ZoneSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoneSettingsView.swift; sourceTree = "<group>"; };
 		037339DA2C493D1E00C1EF0B /* Util.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Util.swift; sourceTree = "<group>"; };
 		037339DC2C4CBA1C00C1EF0B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		037339DD2C4CBADA00C1EF0B /* build.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
@@ -63,31 +100,7 @@
 		03B947F92C3090DF00E75D5E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		03B947FA2C31B93700E75D5E /* Bluetooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bluetooth.swift; sourceTree = "<group>"; };
 		03CF7CEC2C3B5B2500AC39E7 /* Timed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timed.swift; sourceTree = "<group>"; };
-		03D4E6B92C363E9C0016FC6B /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		0398B3C82C68F2810089DFD6 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				BluetoothSettingsView.swift,
-				Icons.swift,
-				LinksSettingsView.swift,
-				ListView.swift,
-				MiscViews.swift,
-				SettingsView.swift,
-				SwiftUIGlue.swift,
-				TabView.swift,
-				ZoneSelectionView.swift,
-				ZoneSettingsView.swift,
-			);
-			target = 03B947C22C30858900E75D5E /* TooFarDidntLock */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		0398B3C72C68F2730089DFD6 /* View */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (0398B3C82C68F2810089DFD6 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = View; sourceTree = "<group>"; };
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		03B947C02C30858900E75D5E /* Frameworks */ = {
@@ -114,6 +127,39 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0338E8A62C83B8710063A435 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				0338E89E2C83B8710063A435 /* BluetoothModel.swift */,
+				0338E89F2C83B8710063A435 /* DeviceModel.swift */,
+				0338E8A02C83B8710063A435 /* LinkModel.swift */,
+				0338E8A12C83B8710063A435 /* Model.swift */,
+				0338E8A22C83B8710063A435 /* README.md */,
+				0338E8A32C83B8710063A435 /* Storage.swift */,
+				0338E8A42C83B8710063A435 /* WifiModel.swift */,
+				0338E8A52C83B8710063A435 /* ZoneModel.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		0338E8BA2C83B8810063A435 /* View */ = {
+			isa = PBXGroup;
+			children = (
+				0338E8AF2C83B8810063A435 /* BluetoothSettingsView.swift */,
+				0338E8B02C83B8810063A435 /* Icons.swift */,
+				0338E8B12C83B8810063A435 /* LinksSettingsView.swift */,
+				0338E8B22C83B8810063A435 /* ListView.swift */,
+				0338E8B32C83B8810063A435 /* MiscViews.swift */,
+				0338E8B42C83B8810063A435 /* SettingsView.swift */,
+				0338E8B52C83B8810063A435 /* SwiftUIGlue.swift */,
+				0338E8B62C83B8810063A435 /* TabView.swift */,
+				0338E8B72C83B8810063A435 /* WifiSettingsView.swift */,
+				0338E8B82C83B8810063A435 /* ZoneSelectionView.swift */,
+				0338E8B92C83B8810063A435 /* ZoneSettingsView.swift */,
+			);
+			path = View;
+			sourceTree = "<group>";
+		};
 		03B947BA2C30858900E75D5E = {
 			isa = PBXGroup;
 			children = (
@@ -139,7 +185,8 @@
 		03B947C52C30858900E75D5E /* TooFarDidntLock */ = {
 			isa = PBXGroup;
 			children = (
-				0398B3C72C68F2730089DFD6 /* View */,
+				0338E8BA2C83B8810063A435 /* View */,
+				0338E8A62C83B8710063A435 /* Model */,
 				03B947F92C3090DF00E75D5E /* Info.plist */,
 				0398B3C12C5FA2FB0089DFD6 /* Wifi.swift */,
 				0398B3C52C679FB70089DFD6 /* Zone.swift */,
@@ -150,7 +197,6 @@
 				03B947C62C30858900E75D5E /* TooFarDidntLockApp.swift */,
 				037339DA2C493D1E00C1EF0B /* Util.swift */,
 				03CF7CEC2C3B5B2500AC39E7 /* Timed.swift */,
-				03D4E6B92C363E9C0016FC6B /* Model.swift */,
 				03B947CA2C30858B00E75D5E /* Assets.xcassets */,
 				03B947CF2C30858C00E75D5E /* TooFarDidntLock.entitlements */,
 				03B947CC2C30858C00E75D5E /* Preview Content */,
@@ -287,6 +333,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0338E8A72C83B8710063A435 /* README.md in Resources */,
 				03B947CE2C30858C00E75D5E /* Preview Assets.xcassets in Resources */,
 				03B947CB2C30858B00E75D5E /* Assets.xcassets in Resources */,
 			);
@@ -313,7 +360,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				03D4E6BA2C363E9C0016FC6B /* Model.swift in Sources */,
 				03CF7CED2C3B5B2500AC39E7 /* Timed.swift in Sources */,
 				03B947F82C30869F00E75D5E /* AboutView.swift in Sources */,
 				03311BAF2C6F80160058F1B2 /* Link.swift in Sources */,
@@ -321,6 +367,24 @@
 				037339DB2C493D2200C1EF0B /* Util.swift in Sources */,
 				03B947FB2C31B93700E75D5E /* Bluetooth.swift in Sources */,
 				03B947C72C30858900E75D5E /* TooFarDidntLockApp.swift in Sources */,
+				0338E8A82C83B8710063A435 /* ZoneModel.swift in Sources */,
+				0338E8A92C83B8710063A435 /* Model.swift in Sources */,
+				0338E8AA2C83B8710063A435 /* DeviceModel.swift in Sources */,
+				0338E8BB2C83B8810063A435 /* BluetoothSettingsView.swift in Sources */,
+				0338E8BC2C83B8810063A435 /* WifiSettingsView.swift in Sources */,
+				0338E8BD2C83B8810063A435 /* TabView.swift in Sources */,
+				0338E8BE2C83B8810063A435 /* MiscViews.swift in Sources */,
+				0338E8BF2C83B8810063A435 /* LinksSettingsView.swift in Sources */,
+				0338E8C02C83B8810063A435 /* Icons.swift in Sources */,
+				0338E8C12C83B8810063A435 /* SwiftUIGlue.swift in Sources */,
+				0338E8C22C83B8810063A435 /* SettingsView.swift in Sources */,
+				0338E8C32C83B8810063A435 /* ListView.swift in Sources */,
+				0338E8C42C83B8810063A435 /* ZoneSelectionView.swift in Sources */,
+				0338E8C52C83B8810063A435 /* ZoneSettingsView.swift in Sources */,
+				0338E8AB2C83B8710063A435 /* BluetoothModel.swift in Sources */,
+				0338E8AC2C83B8710063A435 /* LinkModel.swift in Sources */,
+				0338E8AD2C83B8710063A435 /* Storage.swift in Sources */,
+				0338E8AE2C83B8710063A435 /* WifiModel.swift in Sources */,
 				0398B3C22C5FA2FB0089DFD6 /* Wifi.swift in Sources */,
 				0398B3C62C679FBB0089DFD6 /* Zone.swift in Sources */,
 			);

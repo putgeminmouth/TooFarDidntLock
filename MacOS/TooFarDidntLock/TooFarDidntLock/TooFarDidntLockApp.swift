@@ -15,8 +15,9 @@ struct TooFarDidntLockApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     // TODO: debounce by group
     let bluetoothScanner: BluetoothScanner
-    @State var bluetoothDebouncer: Debouncer<BluetoothDevice>
+//    @State var bluetoothDebouncer: Debouncer<BluetoothDevice>
     var bluetoothMonitor: BluetoothMonitor
+    var wifiMonitor: WifiMonitor
 //    @Debounced(interval: 2.0) var domainModel = DomainModel(
     var domainModel: DomainModel
     var runtimeModel = RuntimeModel()
@@ -24,6 +25,7 @@ struct TooFarDidntLockApp: App {
     let wifiScanner: WifiScanner
     let zoneEvaluator: ZoneEvaluator
     let bluetoothLinkEvaluator: BluetoothLinkEvaluator
+    let wifiLinkEvaluator: WifiLinkEvaluator
     
     @AppStorage("applicationStorage") var applicationStorage = ApplicationStorage()
 
@@ -46,17 +48,20 @@ struct TooFarDidntLockApp: App {
     
     init() {
         bluetoothScanner = BluetoothScanner(timeToLive: 120)
-        bluetoothDebouncer = Debouncer(debounceInterval: 2)
+//        bluetoothDebouncer = Debouncer(debounceInterval: 2)
         bluetoothMonitor = BluetoothMonitor(bluetoothScanner: bluetoothScanner)
-        
+
+        wifiScanner = try! WifiScanner(timeToLive: 120)
+        wifiMonitor = WifiMonitor(wifiScanner: wifiScanner)
+
         domainModel = DomainModel(
             version: 0,
             zones: [ManualZone(id: UUID(), name: "Default", active: true)],
             wellKnownBluetoothDevices: [],
+            wellKnownWifiDevices: [],
             links: []
         )
         
-        wifiScanner = try! WifiScanner()
         zoneEvaluator = ZoneEvaluator(
             manual: ManualZoneEvaluator(),
             wifi: WifiZoneEvaluator(wifi: wifiScanner))
@@ -66,6 +71,13 @@ struct TooFarDidntLockApp: App {
             runtimeModel: runtimeModel,
             bluetoothScanner: bluetoothScanner,
             bluetoothMonitor: bluetoothMonitor
+        )
+        
+        wifiLinkEvaluator = WifiLinkEvaluator(
+            domainModel: domainModel,
+            runtimeModel: runtimeModel,
+            wifiScanner: wifiScanner,
+            wifiMonitor: wifiMonitor
         )
     }
     
@@ -185,6 +197,7 @@ struct TooFarDidntLockApp: App {
             .environmentObject(runtimeModel)
             .environmentObject(NotObserved(runtimeModel))
             .environmentObject(bluetoothMonitor)
+            .environmentObject(wifiMonitor)
         }
     }
 

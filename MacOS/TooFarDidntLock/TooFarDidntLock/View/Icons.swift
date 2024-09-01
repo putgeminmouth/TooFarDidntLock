@@ -20,6 +20,7 @@ struct Icons {
     static let zone = Icon(systemName: "mappin.and.ellipse")
     static let settings = Icon(systemName: "gear")
     static let bluetooth = Icon(resourceName: "Bluetooth")
+    static let wifi = Icon(systemName: "wifi")
     static let link = Icon(systemName: "link")
     struct Zones {
         static let manual = Icon(systemName: "lightswitch.on")

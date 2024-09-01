@@ -44,6 +44,9 @@ struct SettingsView: View {
                     ZoneSettingsView()
                 },
                 .divider,
+                .tab(label: "Wifi", icon: Icons.wifi.toImage()) {
+                    WifiSettingsView()
+                },
                 .tab(label: "Bluetooth", icon: Icons.bluetooth.toImage()) {
                     BluetoothSettingsView()
                 }
@@ -101,6 +104,7 @@ struct LineChart: View {
     var body: some View {
         // we want to keep the graph moving even if no new data points have come in
         // this binds the view render to the timer updates
+        // TODO: is still working?
         let _ = refreshViewTimer
         let now = Date.now
         let xAxisMin = Calendar.current.date(byAdding: .second, value: -(xRange+1), to: now)!
