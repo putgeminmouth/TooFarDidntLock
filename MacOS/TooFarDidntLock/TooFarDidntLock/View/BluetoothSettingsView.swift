@@ -20,7 +20,9 @@ struct BluetoothSettingsView: View {
             AvailableBluetoothDevicesSettingsView(selectedId: bindOpt($selectedId, UUID()))
             if let monitorData = selectedMonitor?.data {
                 BluetoothDeviceMonitorView(
-                    monitorData: monitorData
+                    monitorData: monitorData,
+                    availableChartTypes: Set([.rssiRaw, .rssiSmoothed]),
+                    selectedChartTypes: Set([.rssiRaw, .rssiSmoothed])
                 )
                 // we want to force the view to recreate when changing data
                 .id(ObjectIdentifier(monitorData))
@@ -31,7 +33,7 @@ struct BluetoothSettingsView: View {
                     .border(Color.primary, width: 1)
             }
         }
-        .onChange(of: selectedId ?? emptyUUID) { (old, new) in
+        .onChange(of: selectedId ?? emptyUUID) { (old, new: UUID) in
             if old != emptyUUID {
                 selectedMonitor?.cancellable.cancel()
                 selectedMonitor = nil
@@ -41,7 +43,7 @@ struct BluetoothSettingsView: View {
 
                 // just for the UX, backfill with existing data
                 if let data = bluetoothMonitor.dataFor(deviceId: new).first,
-                   let firstSample = data.rssiRawSamples.first?.b {
+                   let firstSample = data.rssiRawSamples.first?.value {
                     selectedMonitor!.data.rssiRawSamples = data.rssiRawSamples
                     selectedMonitor!.data.smoothingFunc = BluetoothMonitor.initSmoothingFunc(initialRSSI: firstSample)
                     BluetoothMonitor.recalculate(monitorData: selectedMonitor!.data)
@@ -54,6 +56,7 @@ struct BluetoothSettingsView: View {
 struct BluetoothDeviceView: View {
     @Binding var uuid: String?
     @Binding var name: String?
+    @Binding var transmitPower: Double?
     @Binding var rssi: Double?
     @Binding var lastSeenAt: Date?
 
@@ -61,6 +64,7 @@ struct BluetoothDeviceView: View {
         VStack(alignment: .leading) {
             Text("UUID: \(uuid ?? "00000000-0000-0000-0000-000000000000")")
             Text("Name: \(name ?? "")")
+            Text("Power: \(transmitPower ?? 0)")
             Text("RSSI: \(rssi ?? 0)")
             if let lastSeenAt = lastSeenAt { Text("Latency: \(lastSeenAt.distance(to: Date.now))s") }
         }
@@ -90,6 +94,7 @@ struct BluetoothDevicesListView: View {
                 BluetoothDeviceView(
                     uuid: Binding.constant(device.id.uuidString),
                     name: Binding.constant(device.name),
+                    transmitPower: Binding.constant(device.transmitPower),
                     rssi: Binding.constant(device.lastSeenRSSI),
                     lastSeenAt: Binding.constant(nil))
                 // make row occupy full width
@@ -142,103 +147,110 @@ struct BluetoothDeviceMonitorView: View {
     }
 
     @State var monitorData: BluetoothMonitorData
-    @State var availableChartTypes = [ChartType]()
-    @State var linkedDeviceChartType: ChartType = .distance
+    @State var availableChartTypes: Set<ChartType>
+    @State var selectedChartTypes: Set<ChartType>
     
-    @State var chartTypeAdjustedSamples: [Tuple2<Date, Double>] = []
-    @State var chartTypeAdjustedYMin: Double = 0
-    @State var chartTypeAdjustedYMax: Double = 0
-    @State var chartTypeAdjustedYLastUpdated = Date()
+    @State private var chartSamples: LineChart.Samples = [:]
+    @State private var chartYMin: Double = 0
+    @State private var chartYMax: Double = 0
+    @State private var chartYLastUpdated = Date()
 
     var body: some View {
         VStack(alignment: .leading) {
-            Picker(selection: $linkedDeviceChartType, label: EmptyView()) {
-                ForEach(availableChartTypes, id: \.self) { type in
-                    switch type {
-                    case .rssiRaw:
-                        Text("Raw signal power (decibels)").tag(type)
-                    case .rssiSmoothed:
-                        Text("Smoothed signal power (decibels)").tag(type)
-                    case .distance:
-                        Text("Calculated Distance (meters)").tag(type)
-                    }
-                }
+            Menu("Select data series") {
+                Toggle("All", isOn: bindSetToggle($selectedChartTypes, availableChartTypes))
+                    .toggleStyle(.button)
+                Divider()
+                Toggle("Raw signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiRaw]))
+                    .toggleStyle(.checkbox)
+                Toggle("Smoothed signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiSmoothed]))
+                    .toggleStyle(.checkbox)
+                Toggle("Calculated Distance (meters)", isOn: bindSetToggle($selectedChartTypes, [.distance]))
+                    .toggleStyle(.checkbox)
             }
             LineChart(
-                samples: $chartTypeAdjustedSamples,
+                samples: $chartSamples,
                 xRange: 60,
-                yAxisMin: $chartTypeAdjustedYMin,
-                yAxisMax: $chartTypeAdjustedYMax)
+                yAxisMin: $chartYMin,
+                yAxisMax: $chartYMax)
         }
         .onReceive(monitorData.objectWillChange) { _ in
             recalculate()
-            if chartTypeAdjustedSamples.count < 3 {
-                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSamples)
-                chartTypeAdjustedYMin = ymin
-                chartTypeAdjustedYMax = ymax
+            chartYMin = Double.greatestFiniteMagnitude
+            chartYMax = -Double.greatestFiniteMagnitude
+            for (key, chartTypeAdjustedSample) in chartSamples {
+                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
+                chartYMin = Double.minimum(chartYMin, ymin)
+                chartYMax = Double.maximum(chartYMax, ymax)
             }
+            if chartSamples.isEmpty {
+                chartYMin = 0
+                chartYMax = 1
+            }
+            assert(chartYMin <= chartYMax, "\(chartYMin) <= \(chartYMax)")
         }
-        .onChange(of: linkedDeviceChartType) {
+        .onChange(of: selectedChartTypes) {
             recalculate()
-            let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSamples)
-            chartTypeAdjustedYMin = ymin
-            chartTypeAdjustedYMax = ymax
-        }
-        .onAppear {
-            if monitorData.distanceSmoothedSamples != nil {
-                availableChartTypes = ChartType.allCases
-                linkedDeviceChartType = .distance
-            } else {
-                availableChartTypes = ChartType.allCases.filter{$0 != .distance}
-                linkedDeviceChartType = .rssiSmoothed
+            chartYMin = Double.greatestFiniteMagnitude
+            chartYMax = -Double.greatestFiniteMagnitude
+            for (key, chartTypeAdjustedSample) in chartSamples {
+                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
+                chartYMin = Double.minimum(chartYMin, ymin)
+                chartYMax = Double.maximum(chartYMax, ymax)
+                
             }
+            if chartSamples.isEmpty {
+                chartYMin = 0
+                chartYMax = 1
+            }
+            assert(chartYMin <= chartYMax, "\(chartYMin) <= \(chartYMax)")
         }
     }
-    func calcBounds(_ samples: [Tuple2<Date, Double>]) -> (sampleMin: Double, sampleMax: Double, ymin: Double, ymax: Double) {
-        let stddev = samples.map{$0.b}.standardDeviation()
-        let sampleMin = samples.min(by: {$0.b < $1.b})?.b ?? 0
-        let sampleMax = samples.max(by: {$0.b < $1.b})?.b ?? 0
+    func calcBounds(_ samples: [DataSample]) -> (sampleMin: Double, sampleMax: Double, ymin: Double, ymax: Double) {
+        let stddev = samples.map{$0.value}.standardDeviation()
+        let sampleMin = samples.min(by: {$0.value < $1.value})?.value ?? 0
+        let sampleMax = samples.max(by: {$0.value < $1.value})?.value ?? 0
         let ymin = sampleMin - stddev * 1
         let ymax = sampleMax + stddev * 1
         return (sampleMin: sampleMin, sampleMax: sampleMax, ymin: ymin, ymax: ymax)
     }
-    func smoothInterpolateBounds(_ samples: [Tuple2<Date, Double>]) {
+    func smoothInterpolateBounds(_ samples: [DataSample]) {
         let (sampleMin, sampleMax, ymin, ymax) = calcBounds(samples)
 
-        let chartTypeAdjustedYShouldUpdate = chartTypeAdjustedYLastUpdated.distance(to: Date.now) > 5
+        let chartTypeAdjustedYShouldUpdate = chartYLastUpdated.distance(to: Date.now) > 5
 
         if chartTypeAdjustedYShouldUpdate {
-            chartTypeAdjustedYLastUpdated = Date.now
+            chartYLastUpdated = Date.now
             let a = 0.5
             let b = 1-a
 
-            chartTypeAdjustedYMin = chartTypeAdjustedYMin * a + ymin * b
-            chartTypeAdjustedYMax = chartTypeAdjustedYMax * a + ymax * b
+            chartYMin = chartYMin * a + ymin * b
+            chartYMax = chartYMax * a + ymax * b
         }
-        chartTypeAdjustedYMin = min(sampleMin, chartTypeAdjustedYMin)
-        chartTypeAdjustedYMax = max(sampleMax, chartTypeAdjustedYMax)
+        chartYMin = min(sampleMin, chartYMin)
+        chartYMax = max(sampleMax, chartYMax)
     }
     func recalculate() {
-        if monitorData.distanceSmoothedSamples != nil {
-            availableChartTypes = ChartType.allCases
-        } else {
-            availableChartTypes = ChartType.allCases.filter{$0 != .distance}
+        chartSamples = [:]
+        
+        let samples1 = monitorData.rssiRawSamples
+        if selectedChartTypes.contains(.rssiRaw) {
+            smoothInterpolateBounds(samples1)
+//            var chartTypeAdjustedSamples = LineChart.Samples()
+            chartSamples[DataDesc("rssiRaw")] = samples1
         }
-        switch linkedDeviceChartType {
-        case .rssiRaw:
-            let samples = monitorData.rssiRawSamples
-            smoothInterpolateBounds(samples)
-            chartTypeAdjustedSamples = samples
-        case .rssiSmoothed:
-            let samples = monitorData.rssiSmoothedSamples
-            smoothInterpolateBounds(samples)
-            chartTypeAdjustedSamples = samples
-        case .distance:
-            if let samples = monitorData.distanceSmoothedSamples {
-                smoothInterpolateBounds(samples)
-                chartTypeAdjustedYMin = max(0, chartTypeAdjustedYMin)
-                chartTypeAdjustedSamples = samples
-            }
+        
+        if selectedChartTypes.contains(.rssiSmoothed) {
+            let samples2 = monitorData.rssiSmoothedSamples
+            smoothInterpolateBounds(samples2)
+            chartSamples[DataDesc("rssiSmoothed")] = samples2
+        }
+        
+        if selectedChartTypes.contains(.distance),
+           let samples3 = monitorData.distanceSmoothedSamples {
+            smoothInterpolateBounds(samples3)
+            chartYMin = max(0, chartYMin)
+            chartSamples[DataDesc("distance")] = samples3
         }
     }
 }
@@ -258,10 +270,10 @@ struct BluetoothLinkSettingsView: View {
     
     @State var linkedLastSeenRSSI: Double?
     @State var linkedLastSeenAt: Date?
-
+    
     var body: some View {
         let bluetoothLinkModel = bluetoothLinkModel.value
-        let linkedDevice = domainModel.wellKnownBluetoothDevices.first{$0.id == bluetoothLinkModel?.deviceId}
+        let linkedDevice = runtimeModel.value.bluetoothStates.first{$0.id == bluetoothLinkModel?.deviceId}
         let linkedZone: Binding<UUID?> = bindOpt(self.$bluetoothLinkModel,
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
@@ -276,19 +288,12 @@ struct BluetoothLinkSettingsView: View {
                         BluetoothDeviceView(
                             uuid: Binding.constant(linkedDevice?.id.uuidString),
                             name: Binding.constant(linkedDevice?.name),
+                            transmitPower: Binding.constant(linkedDevice?.transmitPower),
                             rssi: $linkedLastSeenRSSI,
                             lastSeenAt: $linkedLastSeenAt)
                         .padding(4)
                         .border(Color.gray, width: 1)
                         .cornerRadius(2)
-                        // likely unnecessary optimization: we avoid binding the entire view to runtimeModel
-                        // and only update these props. elsewhere we use the cached model
-                        .onReceive(runtimeModel.value.objectWillChange) { _ in
-                            if let state = runtimeModel.value.bluetoothStates.first{$0.id == bluetoothLinkModel?.deviceId} {
-                                linkedLastSeenRSSI = state.lastSeenRSSI
-                                linkedLastSeenAt = state.lastSeenAt
-                            }
-                        }
                     }
                     LabeledDoubleSlider(
                         label: "Reference Power",
@@ -337,7 +342,9 @@ struct BluetoothLinkSettingsView: View {
                 
                 if let monitor = monitor {
                     BluetoothDeviceMonitorView(
-                        monitorData: monitor.data
+                        monitorData: monitor.data,
+                        availableChartTypes: Set(BluetoothDeviceMonitorView.ChartType.allCases),
+                        selectedChartTypes: Set([.distance])
                     )
                 }
             }
@@ -345,6 +352,16 @@ struct BluetoothLinkSettingsView: View {
         }
         .onAppear() {
             onAppear()
+        }
+        // likely unnecessary optimization: we avoid binding the entire view to runtimeModel
+        // and only update these props. elsewhere we use the cached model
+        .onReceive(runtimeModel.value.bluetoothStateDidChange(id: {bluetoothLinkModel?.deviceId})) { update in
+            if update.lastSeenRSSI != linkedLastSeenRSSI {
+                linkedLastSeenRSSI = update.lastSeenRSSI
+            }
+            if update.lastSeenAt != linkedLastSeenAt {
+                linkedLastSeenAt = update.lastSeenAt
+            }
         }
         .onChange(of: bluetoothLinkModel?.referencePower ?? 0) { (old, new) in
             monitor?.data.referenceRSSIAtOneMeter = new
@@ -360,7 +377,6 @@ struct BluetoothLinkSettingsView: View {
         let isNew = domainModel.links.first{$0.id == bluetoothLinkModel.id} == nil
         monitor = bluetoothMonitor.startMonitoring(bluetoothLinkModel.deviceId, referenceRSSIAtOneMeter: bluetoothLinkModel.referencePower)
 
-
         // just for the UX, backfill with existing data
         // if new, pick any available monitor for the device, but recalculate with current settings
         // if existing, we can keep all the data since we always start with the current settings
@@ -368,7 +384,7 @@ struct BluetoothLinkSettingsView: View {
             if let data = bluetoothMonitor.dataFor(deviceId: linkedDevice.id).first {
                 monitor!.data.rssiRawSamples = data.rssiRawSamples
                 monitor!.data.smoothingFunc = BluetoothMonitor.initSmoothingFunc(
-                    initialRSSI: monitor!.data.rssiRawSamples.first?.b ?? bluetoothLinkModel.referencePower,
+                    initialRSSI: monitor!.data.rssiRawSamples.first?.value ?? bluetoothLinkModel.referencePower,
                     processNoise: bluetoothLinkModel.environmentalNoise
                 )
 
@@ -381,6 +397,20 @@ struct BluetoothLinkSettingsView: View {
             monitor!.data.distanceSmoothedSamples = linkState.monitorData.data.distanceSmoothedSamples
             monitor!.data.smoothingFunc = linkState.monitorData.data.smoothingFunc
         }
+    }
+}
+
+struct MaMa: View {
+    @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
+    @Binding var bluetoothLinkModel: OptionalModel<BluetoothLinkModel>
+    @State var stateUpdates = ProxyPublisher<MonitoredPeripheral>(nil)
+    
+    var body: some View {
+        let bluetoothLinkModel = bluetoothLinkModel.value
+
+        EmptyView()
+            .onReceive(runtimeModel.value.bluetoothStateDidChange(id: {bluetoothLinkModel?.deviceId})) { update in
+            }
     }
 }
 

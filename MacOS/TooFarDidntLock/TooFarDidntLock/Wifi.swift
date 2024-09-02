@@ -151,24 +151,24 @@ class WifiMonitor: ObservableObject {
     private typealias Monitor = (monitorId: UUID, deviceId: String, data: WifiMonitorData)
     
     static func updateMonitorData(monitorData: WifiMonitorData, update: MonitoredWifiDevice) {
-        func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
-            return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
+        func tail(_ arr: [DataSample]) -> [DataSample] {
+            return arr.filter{$0.date.distance(to: Date()) < 60}.suffix(1000)
         }
 
         let smoothingFunc = monitorData.smoothingFunc!
 
-        let rssiSmoothedSample = smoothingFunc.update(measurement: monitorData.rssiRawSamples.last?.b ?? 0)
+        let rssiSmoothedSample = smoothingFunc.update(measurement: monitorData.rssiRawSamples.last?.value ?? 0)
         
-        monitorData.rssiRawSamples = tail(monitorData.rssiRawSamples + [Tuple2(update.lastSeenAt, update.lastSeenRSSI)])
-        assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.a);\($0.1.a)"})")
+        monitorData.rssiRawSamples = tail(monitorData.rssiRawSamples + [DataSample(update.lastSeenAt, update.lastSeenRSSI)])
+        assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.date);\($0.1.date)"})")
         
-        monitorData.rssiSmoothedSamples = tail(monitorData.rssiSmoothedSamples + [Tuple2(update.lastSeenAt, rssiSmoothedSample)])
-        assert(monitorData.rssiSmoothedSamples.count < 2 || zip(monitorData.rssiSmoothedSamples, monitorData.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
+        monitorData.rssiSmoothedSamples = tail(monitorData.rssiSmoothedSamples + [DataSample(update.lastSeenAt, rssiSmoothedSample)])
+        assert(monitorData.rssiSmoothedSamples.count < 2 || zip(monitorData.rssiSmoothedSamples, monitorData.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
         
         if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter,
            var distanceSmoothedSamples = monitorData.distanceSmoothedSamples {
-            distanceSmoothedSamples = tail(distanceSmoothedSamples + [Tuple2(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: rssiSmoothedSample))])
-            assert(distanceSmoothedSamples.count < 2 || zip(distanceSmoothedSamples, distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
+            distanceSmoothedSamples = tail(distanceSmoothedSamples + [DataSample(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: rssiSmoothedSample))])
+            assert(distanceSmoothedSamples.count < 2 || zip(distanceSmoothedSamples, distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
             monitorData.distanceSmoothedSamples = distanceSmoothedSamples
         }
     }
@@ -176,10 +176,10 @@ class WifiMonitor: ObservableObject {
     static func recalculate(monitorData: WifiMonitorData) {
         let smoothingFunc = monitorData.smoothingFunc!
 
-        monitorData.rssiSmoothedSamples = monitorData.rssiRawSamples.map{Tuple2($0.a, smoothingFunc.update(measurement: $0.b))}
+        monitorData.rssiSmoothedSamples = monitorData.rssiRawSamples.map{DataSample($0.date, smoothingFunc.update(measurement: $0.value))}
         
         if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter {
-            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{Tuple2($0.a, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: $0.b))}
+            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{DataSample($0.date, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: $0.value))}
         }
     }
     

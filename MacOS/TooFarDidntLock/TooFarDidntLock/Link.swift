@@ -84,7 +84,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             age = peripheral.lastSeenAt.distance(to: now)
 
             if let d = linkState.monitorData.data.distanceSmoothedSamples?.last {
-                distance = d.second
+                distance = d.value
             }
         }
 
@@ -105,7 +105,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let known = domainModel.wellKnownBluetoothDevices[index]
             // RSSI and such deliberately ignored
             if known.name != update.name ||
-                known.txPower != update.txPower {
+                known.transmitPower != update.transmitPower {
                 domainModel.wellKnownBluetoothDevices[index] = update
             }
         }

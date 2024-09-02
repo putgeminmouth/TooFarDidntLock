@@ -26,6 +26,43 @@ import Combine
   The domainModel doesn't spam updates and we usually want to update everything related, so the naive `struct` approach is used there.
  */
 
+class CancellablePublisher<Output>: ObservableObject, Cancellable {
+    
+    let didPublish: PassthroughSubject<Output, Never>? = PassthroughSubject<Output, Never>()
+    private var cancellable: AnyCancellable?
+
+    init(_ cancel: @escaping () -> Void) {
+        cancellable = AnyCancellable {
+            cancel()
+        }
+    }
+    
+    func cancel() {
+        cancellable?.cancel()
+        cancellable = nil
+    }
+    
+    func send(_ input: Output) {
+        didPublish?.send(input)
+    }
+}
+
+class ProxyPublisher<Output>: Publisher {
+    typealias Output = Output
+    typealias Failure = Never
+
+    var underlying: (any Publisher<Output, Never>)?
+    init(_ underlying: (any Publisher<Output, Never>)?) {
+        self.underlying = underlying
+    }
+    func receive<S>(subscriber: S) where S : Subscriber, Never == S.Failure, Output == S.Input {
+        underlying?.receive(subscriber: subscriber)
+    }
+
+    func send(_ input: Output) {
+        underlying
+    }
+}
 
 class RuntimeModel: ObservableObject {
     @Published var bluetoothStates: [MonitoredPeripheral]
@@ -39,6 +76,14 @@ class RuntimeModel: ObservableObject {
             self.linkStates = linkStates
             self.wifiStates = wifiStates
         }
+
+    func bluetoothStateDidChange(id: @escaping () -> UUID?) -> AnyPublisher<MonitoredPeripheral, Never> {
+        return $bluetoothStates
+            .flatMap{$0.publisher}
+            .filter {
+                return $0.id == id()
+            }.eraseToAnyPublisher()
+    }
 }
 
 // @Observable enables write-backs
@@ -46,6 +91,13 @@ class RuntimeModel: ObservableObject {
 // Publisher: onReceive
 // Equatable: onChange
 class DomainModel: ObservableObject, Observable /*Publisher*//*, Equatable */{
+    static func equate(_ lhs: MonitoredPeripheral, _ rhs: MonitoredPeripheral) -> Bool {
+        // leave out spammy "state" props like rssi
+        return lhs.id == rhs.id
+            && lhs.name == rhs.name
+            && lhs.transmitPower == rhs.transmitPower
+    }
+    
     @Published private(set) var version: Int = 0
     // make them use a METHOD, AKA passive
     // aggresively discourage casual use
@@ -63,7 +115,7 @@ class DomainModel: ObservableObject, Observable /*Publisher*//*, Equatable */{
     
     @Published var wellKnownBluetoothDevices: [MonitoredPeripheral] {
         didSet {
-            if oldValue != wellKnownBluetoothDevices {
+            if oldValue.elementsEqual(wellKnownBluetoothDevices, by: DomainModel.equate) {
                 version += 1
             }
         }

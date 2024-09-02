@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -102,6 +102,10 @@
 		03CF7CEC2C3B5B2500AC39E7 /* Timed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timed.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		0338E8CA2C8630A00063A435 /* Signal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Signal; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		03B947C02C30858900E75D5E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -185,6 +189,7 @@
 		03B947C52C30858900E75D5E /* TooFarDidntLock */ = {
 			isa = PBXGroup;
 			children = (
+				0338E8CA2C8630A00063A435 /* Signal */,
 				0338E8BA2C83B8810063A435 /* View */,
 				0338E8A62C83B8710063A435 /* Model */,
 				03B947F92C3090DF00E75D5E /* Info.plist */,
@@ -243,6 +248,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0338E8CA2C8630A00063A435 /* Signal */,
 			);
 			name = TooFarDidntLock;
 			productName = TooFarDidntLock;

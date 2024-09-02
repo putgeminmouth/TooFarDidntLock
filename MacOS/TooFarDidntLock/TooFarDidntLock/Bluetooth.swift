@@ -12,64 +12,21 @@ func rssiDistance(referenceAtOneMeter: Double, current: Double) -> Double {
     return Double(distanceInMeters)
 }
 
-/*
- Low R (Measurement Noise), High Q (Process Noise): The filter trusts the measurements more and adjusts quickly, resulting in a more reactive estimate that closely tracks the true state despite the noise in the process.
- High R (Measurement Noise), Low Q (Process Noise): The filter trusts the predictions more and smooths out the measurement noise, leading to a more stable estimate but potentially lagging behind sudden changes in the true state.
- 
- With a lot of process/environmental noise, the prediction is less trusted, making the filter more reactive to pure measurements.
- */
-class KalmanFilter {
-    var state: Double
-    var covariance: Double
-    
-    var processNoise: Double
-    
-    var measurementNoise: Double
-    
-    init(initialState: Double, initialCovariance: Double, processNoise: Double, measurementNoise: Double) {
-        self.state = initialState
-        self.covariance = initialCovariance
-        self.processNoise = processNoise
-        self.measurementNoise = measurementNoise
-    }
-    
-    func update(measurement: Double) -> Double {
-        // Prediction update
-        let predictedState = state
-        let predictedCovariance = covariance + processNoise
-        
-        // Measurement update
-        let innovation = measurement - predictedState
-        let innovationCovariance = predictedCovariance + measurementNoise
-        
-        // Kalman gain
-        let kalmanGain = predictedCovariance / innovationCovariance
-        
-        // Update state and covariance
-        state = predictedState + kalmanGain * innovation
-        covariance = (1 - kalmanGain) * predictedCovariance
-        
-        return state
-    }
-}
-
-// defining equality on uuid here can break stuff in swiftui+debouncer......
-struct MonitoredPeripheral: Equatable {
+struct MonitoredPeripheral {
     enum ConnectionState {
         case connected
         case reconnecting
         case disconnected
     }
         
-    // CBPeripheral.state doesnt update as we'd like; notably disconnect is unreliable
-//    let peripheral: CBPeripheral
     let id: UUID
     let name: String?
-    let txPower: Double?
-    @EquatableIgnore var lastSeenRSSI: Double
-    @EquatableIgnore var lastSeenAt: Date
-    @EquatableIgnore var connectRetriesRemaining: Int
-    @EquatableIgnore var connectionState: ConnectionState
+    // call it transmitPower not txPower as the latter sometimes means "referencePowerAtOneMeter"...
+    let transmitPower: Double?
+    var lastSeenRSSI: Double
+    var lastSeenAt: Date
+    var connectRetriesRemaining: Int
+    var connectionState: ConnectionState
 }
 
 class BluetoothScanner: NSObject, CBCentralManagerDelegate {
@@ -153,7 +110,7 @@ class BluetoothScanner: NSObject, CBCentralManagerDelegate {
         let update = MonitoredPeripheral(
             id: peripheral.identifier,
             name: peripheral.name,
-            txPower: advertisementData[CBAdvertisementDataTxPowerLevelKey] as? Double,
+            transmitPower: advertisementData[CBAdvertisementDataTxPowerLevelKey] as? Double,
             lastSeenRSSI: RSSI.doubleValue,
             lastSeenAt: now,
             connectRetriesRemaining: existing?.connectRetriesRemaining ?? 0,
@@ -288,24 +245,24 @@ class BluetoothMonitor: ObservableObject {
     private typealias Monitor = (monitorId: UUID, deviceId: UUID, data: BluetoothMonitorData)
     
     static func updateMonitorData(monitorData: BluetoothMonitorData, update: MonitoredPeripheral) {
-        func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
-            return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
+        func tail(_ arr: [DataSample]) -> [DataSample] {
+            return arr.filter{$0.date.distance(to: Date()) < 60}.suffix(1000)
         }
 
         let smoothingFunc = monitorData.smoothingFunc!
 
-        let rssiSmoothedSample = smoothingFunc.update(measurement: monitorData.rssiRawSamples.last?.b ?? 0)
+        let rssiSmoothedSample = smoothingFunc.update(measurement: update.lastSeenRSSI)
         
-        monitorData.rssiRawSamples = tail(monitorData.rssiRawSamples + [Tuple2(update.lastSeenAt, update.lastSeenRSSI)])
-        assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.a);\($0.1.a)"})")
+        monitorData.rssiRawSamples = tail(monitorData.rssiRawSamples + [DataSample(update.lastSeenAt, update.lastSeenRSSI)])
+        assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.date);\($0.1.date)"})")
         
-        monitorData.rssiSmoothedSamples = tail(monitorData.rssiSmoothedSamples + [Tuple2(update.lastSeenAt, rssiSmoothedSample)])
-        assert(monitorData.rssiSmoothedSamples.count < 2 || zip(monitorData.rssiSmoothedSamples, monitorData.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
+        monitorData.rssiSmoothedSamples = tail(monitorData.rssiSmoothedSamples + [DataSample(update.lastSeenAt, rssiSmoothedSample)])
+        assert(monitorData.rssiSmoothedSamples.count < 2 || zip(monitorData.rssiSmoothedSamples, monitorData.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
         
         if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter,
            var distanceSmoothedSamples = monitorData.distanceSmoothedSamples {
-            distanceSmoothedSamples = tail(distanceSmoothedSamples + [Tuple2(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: rssiSmoothedSample))])
-            assert(distanceSmoothedSamples.count < 2 || zip(distanceSmoothedSamples, distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.a <= next.a })
+            distanceSmoothedSamples = tail(distanceSmoothedSamples + [DataSample(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: rssiSmoothedSample))])
+            assert(distanceSmoothedSamples.count < 2 || zip(distanceSmoothedSamples, distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
             monitorData.distanceSmoothedSamples = distanceSmoothedSamples
         }
     }
@@ -313,16 +270,19 @@ class BluetoothMonitor: ObservableObject {
     static func recalculate(monitorData: BluetoothMonitorData) {
         let smoothingFunc = monitorData.smoothingFunc!
 
-        monitorData.rssiSmoothedSamples = monitorData.rssiRawSamples.map{Tuple2($0.a, smoothingFunc.update(measurement: $0.b))}
+        monitorData.rssiSmoothedSamples = monitorData.rssiRawSamples.map{DataSample($0.date, smoothingFunc.update(measurement: $0.value))}
         
         if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter {
-            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{Tuple2($0.a, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: $0.b))}
+            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{DataSample($0.date, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: $0.value))}
         }
     }
     
-    static func initSmoothingFunc(initialRSSI: Double, processNoise: Double = 0.1) -> KalmanFilter {
-        return KalmanFilter(initialState: initialRSSI, initialCovariance: 2.01, processNoise: processNoise, measurementNoise: 20.01)
-    }
+    static func initSmoothingFunc(
+        initialRSSI: Double,
+        processNoise: Double = 0.1,
+        measurementNoise: Double = 0.1) -> KalmanFilter {
+            return KalmanFilter(initialState: initialRSSI, initialCovariance: 0.01, processNoise: processNoise, measurementNoise: measurementNoise)
+        }
     
     private let bluetoothScanner: BluetoothScanner
     private var cancellable: Cancellable? = nil
@@ -366,7 +326,9 @@ class BluetoothMonitor: ObservableObject {
 
         for monitorData in monitors.filter{$0.deviceId == update.id}.map{$0.data} {
             if monitorData.smoothingFunc == nil {
-                monitorData.smoothingFunc = BluetoothMonitor.initSmoothingFunc(initialRSSI: update.lastSeenRSSI)
+                monitorData.smoothingFunc = BluetoothMonitor.initSmoothingFunc(
+                    initialRSSI: update.lastSeenRSSI,
+                    measurementNoise: 1.0)
             }
             
             BluetoothMonitor.updateMonitorData(monitorData: monitorData, update: update)

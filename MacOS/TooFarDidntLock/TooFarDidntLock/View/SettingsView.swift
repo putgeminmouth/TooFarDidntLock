@@ -96,8 +96,10 @@ struct GeneralSettingsView: View {
 }
 
 struct LineChart: View {
+    typealias Samples = [DataDesc: [DataSample]]
+    
     @State var refreshViewTimer = Timed(interval: 2)
-    @Binding var samples: [Tuple2<Date, Double>]
+    @Binding var samples: Samples
     @State var xRange: Int
     @Binding var yAxisMin: Double
     @Binding var yAxisMax: Double
@@ -110,30 +112,30 @@ struct LineChart: View {
         let xAxisMin = Calendar.current.date(byAdding: .second, value: -(xRange+1), to: now)!
         let xAxisMax = Calendar.current.date(byAdding: .second, value: 0, to: now)!
 
-        let filteredSamples = samples.filter{$0.a > xAxisMin}
-        let average: Double? = (filteredSamples.first != nil) && (filteredSamples.last != nil) ? (filteredSamples.first!.b + filteredSamples.last!.b) / 2.0 : nil
-        let averageSamples: [Tuple2<Date, Double>]? = average != nil ? [Tuple2(xAxisMin, average!), Tuple2(xAxisMax, average!)] : nil
+        let filteredSamples: [(key: DataDesc, value: [DataSample])] = samples
+            .mapValues{$0.filter{$0.date > xAxisMin}}
+            .sorted(by: {$0.key < $1.key})
         
         Chart {
-            if filteredSamples.count > 2 {
-                ForEach(filteredSamples, id: \.a) { sample in
-                    LineMark(x: .value("t", sample.a), y: .value("y", sample.b), series: .value("", "samples"))
-                    PointMark(x: .value("t", sample.a), y: .value("y", sample.b))
-                        .symbolSize(10)
-                    AreaMark(x: .value("t", sample.a), yStart: .value("y", yAxisMin), yEnd :.value("y", sample.b))
-                        .foregroundStyle(Color.init(hue: 1, saturation: 0, brightness: 1, opacity: 0.05))
-                }
-                
-                if let averageSamples {
-                    ForEach(averageSamples, id: \.a) { sample in
-                        LineMark(x: .value("t2", sample.a), y: .value("y2", sample.b), series: .value("", "regression"))
-                            .lineStyle(StrokeStyle(dash: [5]))
-                            .foregroundStyle(Color.init(hue: 1, saturation: 0, brightness: 0.40, opacity: 1.0))
+            ForEach(Binding.constant(filteredSamples.map{(key: $0.key, value: $0.value)}), id: \.wrappedValue.key) {
+                let filteredSampleKey = $0.wrappedValue.key //$0.wrappedValue.0
+                let filteredSample = $0.wrappedValue.value // $0.wrappedValue.1
+                if filteredSample.count > 2 {
+                    ForEach(filteredSample, id: \.date) { sample in
+                        // sereies just needs to be unique AFAICT, actual value doesn't matter
+                        LineMark(x: .value("t", sample.date), y: .value("", sample.value), series: .value("", filteredSampleKey))
+                        // second value is legend
+                            .foregroundStyle(by: .value("", filteredSampleKey.lowercased()))
+                        PointMark(x: .value("t", sample.date), y: .value("", sample.value))
+                            .symbolSize(10)
                     }
                 }
             }
-        }.overlay {
-            if filteredSamples.count > 2 {
+        }
+        .chartLegend(.visible)
+        .chartLegend(position: .bottom)
+        .overlay {
+            if filteredSamples.contains { $0.value.count > 2 } {
                 EmptyView()
             } else {
                 Text("Gathering data...")

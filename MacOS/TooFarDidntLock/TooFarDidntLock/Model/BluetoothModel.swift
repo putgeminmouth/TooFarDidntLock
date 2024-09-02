@@ -2,12 +2,36 @@ import SwiftUI
 import OSLog
 import Combine
 
+typealias DataDesc = String
+//struct DataDesc: Hashable {
+//    let label: String
+//    init(label: String) {
+//        self.label = label
+//    }
+//    init(_ label: String) {
+//        self.init(label: label)
+//    }
+//}
+
+struct DataSample: Equatable, Hashable {
+    let date: Date
+    let value: Double
+    
+    init(date: Date, value: Double) {
+        self.date = date
+        self.value = value
+    }
+    init(_ date: Date, _ value: Double) {
+        self.init(date: date, value: value)
+    }
+}
+
 class BluetoothMonitorData: ObservableObject {
-    @Published var rssiRawSamples = [Tuple2<Date, Double>]()
-    @Published var rssiSmoothedSamples = [Tuple2<Date, Double>]()
+    @Published var rssiRawSamples = [DataSample]()
+    @Published var rssiSmoothedSamples = [DataSample]()
     
     @Published var referenceRSSIAtOneMeter: Double?
-    @Published var distanceSmoothedSamples: [Tuple2<Date, Double>]?
+    @Published var distanceSmoothedSamples: [DataSample]?
 
     var smoothingFunc: KalmanFilter? = nil
 }
@@ -40,5 +64,5 @@ struct BluetoothDevice: Equatable {
 
 struct BluetoothDeviceDescription: Equatable {
     var name: String?
-    var txPower: Double?
+    var transmitPower: Double?
 }

@@ -3,11 +3,11 @@ import OSLog
 import Combine
 
 class WifiMonitorData: ObservableObject {
-    @Published var rssiRawSamples = [Tuple2<Date, Double>]()
-    @Published var rssiSmoothedSamples = [Tuple2<Date, Double>]()
+    @Published var rssiRawSamples = [DataSample]()
+    @Published var rssiSmoothedSamples = [DataSample]()
     
     @Published var referenceRSSIAtOneMeter: Double?
-    @Published var distanceSmoothedSamples: [Tuple2<Date, Double>]?
+    @Published var distanceSmoothedSamples: [DataSample]?
 
     var smoothingFunc: KalmanFilter? = nil
 }

@@ -204,16 +204,16 @@ extension BluetoothDeviceDescription: DictionaryRepresentable {
     func toDict() -> [String: Any?] {
         let dict: [String: Any?] = [
             "name": self.name,
-            "txPower": self.txPower
+            "transmitPower": self.transmitPower
         ]
         return dict
     }
     static func fromDict(_ dict: [String: Any?]) -> BluetoothDeviceDescription? {
-        guard let txPower = (dict["txPower"] as? NSNumber)?.doubleValue
+        guard let transmitPower = (dict["transmitPower"] as? NSNumber)?.doubleValue
         else { return nil }
         return BluetoothDeviceDescription(
             name: dict["name"] as? String,
-            txPower: txPower)
+            transmitPower: transmitPower)
     }
 }
 
@@ -222,7 +222,7 @@ extension MonitoredPeripheral: DictionaryRepresentable {
         let dict: [String: Any?] = [
             "id": self.id.uuidString,
             "name": self.name,
-            "txPower": self.txPower,
+            "transmitPower": self.transmitPower,
             "lastSeenRSSI": self.lastSeenRSSI,
             "lastSeenAt": ISO8601DateFormatter().string(from: self.lastSeenAt)
         ]
@@ -233,13 +233,13 @@ extension MonitoredPeripheral: DictionaryRepresentable {
               let id = UUID(uuidString: idString)
         else { return nil }
         let name = dict["name"] as? String
-        let txPower = (dict["txPower"] as? NSNumber)?.doubleValue
+        let transmitPower = (dict["transmitPower"] as? NSNumber)?.doubleValue
         let lastSeenRSSI = (dict["lastSeenRSSI"] as? NSNumber)?.doubleValue
         let lastSeenAt = (dict["lastSeenAt"] as? String).flatMap{ISO8601DateFormatter().date(from: $0)}
         return MonitoredPeripheral(
             id: id,
             name: name,
-            txPower: txPower,
+            transmitPower: transmitPower,
             lastSeenRSSI: lastSeenRSSI ?? 0,
             lastSeenAt: lastSeenAt ?? Date.distantPast,
             connectRetriesRemaining: 0,

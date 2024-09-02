@@ -31,7 +31,7 @@ struct WifiSettingsView: View {
                     .border(Color.primary, width: 1)
             }
         }
-        .onChange(of: selectedId ?? emptyID) { (old, new) in
+        .onChange(of: selectedId ?? emptyID) { (old, new: String) in
             if old != emptyID {
                 selectedMonitor?.cancellable.cancel()
                 selectedMonitor = nil
@@ -41,7 +41,7 @@ struct WifiSettingsView: View {
 
                 // just for the UX, backfill with existing data
                 if let data = wifiMonitor.dataFor(deviceId: new).first,
-                   let firstSample = data.rssiRawSamples.first?.b {
+                   let firstSample = data.rssiRawSamples.first?.value {
                     selectedMonitor!.data.rssiRawSamples = data.rssiRawSamples
                     selectedMonitor!.data.smoothingFunc = WifiMonitor.initSmoothingFunc(initialRSSI: firstSample)
                     WifiMonitor.recalculate(monitorData: selectedMonitor!.data)
@@ -145,7 +145,7 @@ struct WifiDeviceMonitorView: View {
     @State var availableChartTypes = [ChartType]()
     @State var linkedDeviceChartType: ChartType = .distance
     
-    @State var chartTypeAdjustedSamples: [Tuple2<Date, Double>] = []
+    @State var chartTypeAdjustedSamples: LineChart.Samples = [:]
     @State var chartTypeAdjustedYMin: Double = 0
     @State var chartTypeAdjustedYMax: Double = 0
     @State var chartTypeAdjustedYLastUpdated = Date()
@@ -172,17 +172,21 @@ struct WifiDeviceMonitorView: View {
         }
         .onReceive(monitorData.objectWillChange) { _ in
             recalculate()
-            if chartTypeAdjustedSamples.count < 3 {
-                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSamples)
-                chartTypeAdjustedYMin = ymin
-                chartTypeAdjustedYMax = ymax
+            for (key, chartTypeAdjustedSample) in chartTypeAdjustedSamples {
+                if chartTypeAdjustedSample.count < 3 {
+                    let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
+                    chartTypeAdjustedYMin = Double.minimum(chartTypeAdjustedYMin, ymin)
+                    chartTypeAdjustedYMax = Double.maximum(chartTypeAdjustedYMax, ymax)
+                }
             }
         }
         .onChange(of: linkedDeviceChartType) {
             recalculate()
-            let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSamples)
-            chartTypeAdjustedYMin = ymin
-            chartTypeAdjustedYMax = ymax
+            for (key, chartTypeAdjustedSample) in chartTypeAdjustedSamples {
+                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
+                chartTypeAdjustedYMin = Double.minimum(chartTypeAdjustedYMin, ymin)
+                chartTypeAdjustedYMax = Double.maximum(chartTypeAdjustedYMax, ymax)
+            }
         }
         .onAppear {
             if monitorData.distanceSmoothedSamples != nil {
@@ -194,15 +198,15 @@ struct WifiDeviceMonitorView: View {
             }
         }
     }
-    func calcBounds(_ samples: [Tuple2<Date, Double>]) -> (sampleMin: Double, sampleMax: Double, ymin: Double, ymax: Double) {
-        let stddev = samples.map{$0.b}.standardDeviation()
-        let sampleMin = samples.min(by: {$0.b < $1.b})?.b ?? 0
-        let sampleMax = samples.max(by: {$0.b < $1.b})?.b ?? 0
+    func calcBounds(_ samples: [DataSample]) -> (sampleMin: Double, sampleMax: Double, ymin: Double, ymax: Double) {
+        let stddev = samples.map{$0.value}.standardDeviation()
+        let sampleMin = samples.min(by: {$0.value < $1.value})?.value ?? 0
+        let sampleMax = samples.max(by: {$0.value < $1.value})?.value ?? 0
         let ymin = sampleMin - stddev * 1
         let ymax = sampleMax + stddev * 1
         return (sampleMin: sampleMin, sampleMax: sampleMax, ymin: ymin, ymax: ymax)
     }
-    func smoothInterpolateBounds(_ samples: [Tuple2<Date, Double>]) {
+    func smoothInterpolateBounds(_ samples: [DataSample]) {
         let (sampleMin, sampleMax, ymin, ymax) = calcBounds(samples)
 
         let chartTypeAdjustedYShouldUpdate = chartTypeAdjustedYLastUpdated.distance(to: Date.now) > 5
@@ -224,20 +228,22 @@ struct WifiDeviceMonitorView: View {
         } else {
             availableChartTypes = ChartType.allCases.filter{$0 != .distance}
         }
-        switch linkedDeviceChartType {
-        case .rssiRaw:
-            let samples = monitorData.rssiRawSamples
-            smoothInterpolateBounds(samples)
-            chartTypeAdjustedSamples = samples
-        case .rssiSmoothed:
-            let samples = monitorData.rssiSmoothedSamples
-            smoothInterpolateBounds(samples)
-            chartTypeAdjustedSamples = samples
-        case .distance:
-            if let samples = monitorData.distanceSmoothedSamples {
+        for (key, _) in chartTypeAdjustedSamples {
+            switch linkedDeviceChartType {
+            case .rssiRaw:
+                let samples = monitorData.rssiRawSamples
                 smoothInterpolateBounds(samples)
-                chartTypeAdjustedYMin = max(0, chartTypeAdjustedYMin)
-                chartTypeAdjustedSamples = samples
+                chartTypeAdjustedSamples = [DataDesc("rssiRaw"): samples]
+            case .rssiSmoothed:
+                let samples = monitorData.rssiSmoothedSamples
+                smoothInterpolateBounds(samples)
+                chartTypeAdjustedSamples = [DataDesc("rssiSmoothed"): samples]
+            case .distance:
+                if let samples = monitorData.distanceSmoothedSamples {
+                    smoothInterpolateBounds(samples)
+                    chartTypeAdjustedYMin = max(0, chartTypeAdjustedYMin)
+                    chartTypeAdjustedSamples = [DataDesc("distance"): samples]
+                }
             }
         }
     }

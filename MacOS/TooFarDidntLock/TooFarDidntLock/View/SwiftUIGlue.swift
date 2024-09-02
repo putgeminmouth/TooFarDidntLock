@@ -180,6 +180,18 @@ func bindIntAtScale(_ intBinding: Binding<Int>, steps: Int, scale: @escaping (In
         set: { intBinding.wrappedValue = scale($0) }
     )
 }
+func bindSetToggle<T>(_ lhs: Binding<Set<T>>, _ elems: Set<T>) -> Binding<Bool> {
+    Binding(
+        get: { lhs.wrappedValue.isSuperset(of: elems) },
+        set: {
+            if $0 {
+                lhs.wrappedValue = lhs.wrappedValue.union(elems)
+            } else {
+                lhs.wrappedValue = lhs.wrappedValue.subtracting(elems)
+            }
+        }
+    )
+}
 
 func bindPublisher<Output, P: Publisher<Output, Never>>(_ publisher: P) -> Binding<Output> where P.Output == Output, P.Failure == Never {
     var cancelable: AnyCancellable?
