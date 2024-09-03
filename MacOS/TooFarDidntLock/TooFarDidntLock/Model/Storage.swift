@@ -147,7 +147,8 @@ extension BluetoothLinkModel: DictionaryRepresentable {
             "zoneId": self.zoneId.uuidString,
             "deviceId": self.deviceId.uuidString,
             "referencePower": self.referencePower,
-            "environmentalNoise": self.environmentalNoise,
+            "processVariance": self.processVariance,
+            "measureVariance": self.measureVariance,
             "maximumDistance": self.maxDistance,
             "idleTimeout": self.idleTimeout,
             "requireConnection": self.requireConnection,
@@ -163,7 +164,8 @@ extension BluetoothLinkModel: DictionaryRepresentable {
               let deviceId = UUID(uuidString: deviceIdString),
               let referencePower = (dict["referencePower"] as? NSNumber)?.doubleValue,
               let maximumDistance = (dict["maximumDistance"] as? NSNumber)?.doubleValue,
-              let environmentalNoise = (dict["environmentalNoise"] as? NSNumber)?.doubleValue,
+              let processVariance = (dict["processVariance"] as? NSNumber)?.doubleValue,
+              let measureVariance = (dict["measureVariance"] as? NSNumber)?.doubleValue,
               let idleTimeout = (dict["idleTimeout"] as? NSNumber)?.doubleValue,
               let requireConnection = dict["requireConnection"] as? Bool
         else { return nil }
@@ -172,7 +174,8 @@ extension BluetoothLinkModel: DictionaryRepresentable {
             zoneId: zoneId,
             deviceId: deviceId,
             referencePower: referencePower,
-            environmentalNoise: environmentalNoise,
+            processVariance: processVariance,
+            measureVariance: measureVariance,
             maxDistance: maximumDistance,
             idleTimeout: idleTimeout,
             requireConnection: requireConnection

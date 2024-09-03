@@ -9,6 +9,7 @@ struct BluetoothSettingsView: View {
 
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
+    @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
     @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
 
     let emptyUUID = UUID()
@@ -41,11 +42,13 @@ struct BluetoothSettingsView: View {
             if new != emptyUUID {
                 selectedMonitor = bluetoothMonitor.startMonitoring(new)
 
-                // just for the UX, backfill with existing data
-                if let data = bluetoothMonitor.dataFor(deviceId: new).first,
-                   let firstSample = data.rssiRawSamples.first?.value {
-                    selectedMonitor!.data.rssiRawSamples = data.rssiRawSamples
-                    selectedMonitor!.data.smoothingFunc = BluetoothMonitor.initSmoothingFunc(initialRSSI: firstSample)
+                if let state = runtimeModel.value.bluetoothStates.first{$0.id == new} {
+                    let firstSample = state.lastSeenRSSI
+                    selectedMonitor!.data.smoothingFunc = BluetoothMonitor.initSmoothingFunc(
+                        initialRSSI: firstSample,
+                        processVariance: 0.1,//BluetoothLinkModel.DefaultProcessVariance,
+                        measureVariance: 23.0//BluetoothLinkModel.DefaultMeasureVariance
+                    )
                     BluetoothMonitor.recalculate(monitorData: selectedMonitor!.data)
                 }
             }
@@ -161,12 +164,18 @@ struct BluetoothDeviceMonitorView: View {
                 Toggle("All", isOn: bindSetToggle($selectedChartTypes, availableChartTypes))
                     .toggleStyle(.button)
                 Divider()
-                Toggle("Raw signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiRaw]))
-                    .toggleStyle(.checkbox)
-                Toggle("Smoothed signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiSmoothed]))
-                    .toggleStyle(.checkbox)
-                Toggle("Calculated Distance (meters)", isOn: bindSetToggle($selectedChartTypes, [.distance]))
-                    .toggleStyle(.checkbox)
+                if availableChartTypes.contains(.rssiRaw) {
+                    Toggle("Raw signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiRaw]))
+                        .toggleStyle(.checkbox)
+                }
+                if availableChartTypes.contains(.rssiSmoothed) {
+                    Toggle("Smoothed signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiSmoothed]))
+                        .toggleStyle(.checkbox)
+                }
+                if availableChartTypes.contains(.distance) {
+                    Toggle("Calculated Distance (meters)", isOn: bindSetToggle($selectedChartTypes, [.distance]))
+                        .toggleStyle(.checkbox)
+                }
             }
             LineChart(
                 samples: $chartSamples,
@@ -304,13 +313,21 @@ struct BluetoothLinkSettingsView: View {
                         in: -100...0,
                         format: {"\(Int($0))"})
                     LabeledDoubleSlider(
-                        label: "Environmental noise",
+                        label: "Process variance",
                         description: "TODO",
                         value: bindOpt($bluetoothLinkModel,
-                                       {$0?.environmentalNoise ?? 0.0},
-                                       {$0.value!.environmentalNoise=$1}),
-                        in: 0...100,
-                        format: {"\(Int($0))"})
+                                       {$0?.processVariance ?? BluetoothLinkModel.DefaultProcessVariance},
+                                       {$0.value!.processVariance=$1}),
+                        in: 0.01...50,
+                        format: {"\(String(format: "%.2f", $0))"})
+                    LabeledDoubleSlider(
+                        label: "Measure variance",
+                        description: "TODO",
+                        value: bindOpt($bluetoothLinkModel,
+                                       {$0?.measureVariance ?? BluetoothLinkModel.DefaultMeasureVariance},
+                                       {$0.value!.measureVariance=$1}),
+                        in: 0.01...50,
+                        format: {"\(String(format: "%.2f", $0))"})
                     LabeledDoubleSlider(
                         label: "Max distance",
                         description: "The distance in meters at which the device is considered absent, resulting in a screen lock. It is calculated from the current signal strength and the reference power, and is not very stable or reliable. It is recommended to consider anything less than 5m as close, and anything more as far.",
@@ -366,8 +383,11 @@ struct BluetoothLinkSettingsView: View {
         .onChange(of: bluetoothLinkModel?.referencePower ?? 0) { (old, new) in
             monitor?.data.referenceRSSIAtOneMeter = new
         }
-        .onChange(of: bluetoothLinkModel?.environmentalNoise ?? 0) { (old, new) in
-            monitor?.data.smoothingFunc?.processNoise = new
+        .onChange(of: bluetoothLinkModel?.processVariance ?? 0) { (old, new) in
+            monitor?.data.smoothingFunc?.processVariance = new
+        }
+        .onChange(of: bluetoothLinkModel?.measureVariance ?? 0) { (old, new) in
+            monitor?.data.smoothingFunc?.measureVariance = new
         }
     }
     
@@ -385,7 +405,8 @@ struct BluetoothLinkSettingsView: View {
                 monitor!.data.rssiRawSamples = data.rssiRawSamples
                 monitor!.data.smoothingFunc = BluetoothMonitor.initSmoothingFunc(
                     initialRSSI: monitor!.data.rssiRawSamples.first?.value ?? bluetoothLinkModel.referencePower,
-                    processNoise: bluetoothLinkModel.environmentalNoise
+                    processVariance: bluetoothLinkModel.processVariance,
+                    measureVariance: bluetoothLinkModel.measureVariance
                 )
 
                 BluetoothMonitor.recalculate(monitorData: monitor!.data)
@@ -448,8 +469,9 @@ struct EditBluetoothDeviceLinkModal: View {
                                     id: UUID(),
                                     zoneId: zoneId,
                                     deviceId: selectedDevice.id,
-                                    referencePower: selectedDevice.lastSeenRSSI,
-                                    environmentalNoise: 0,
+                                    referencePower: selectedDevice.lastSeenRSSI,                                    
+                                    processVariance: BluetoothLinkModel.DefaultProcessVariance,
+                                    measureVariance: BluetoothLinkModel.DefaultMeasureVariance,
                                     maxDistance: 1.0,
                                     idleTimeout: 60,
                                     requireConnection: false)

@@ -43,7 +43,11 @@ struct WifiSettingsView: View {
                 if let data = wifiMonitor.dataFor(deviceId: new).first,
                    let firstSample = data.rssiRawSamples.first?.value {
                     selectedMonitor!.data.rssiRawSamples = data.rssiRawSamples
-                    selectedMonitor!.data.smoothingFunc = WifiMonitor.initSmoothingFunc(initialRSSI: firstSample)
+                    selectedMonitor!.data.smoothingFunc = WifiMonitor.initSmoothingFunc(
+                        initialRSSI: firstSample,
+                        processVariance: 0.1,
+                        measureVariance: 23.0
+                    )
                     WifiMonitor.recalculate(monitorData: selectedMonitor!.data)
                 }
             }
@@ -308,8 +312,8 @@ struct WifiDeviceMonitorView: View {
 //                        label: "Environmental noise",
 //                        description: "TODO",
 //                        value: bindOpt($wifiLinkModel,
-//                                       {$0?.environmentalNoise ?? 0.0},
-//                                       {$0.value!.environmentalNoise=$1}),
+//                                       {$0?.processVariance ?? 0.0},
+//                                       {$0.value!.processVariance=$1}),
 //                        in: 0...100,
 //                        format: {"\(Int($0))"})
 //                    LabeledDoubleSlider(
@@ -355,8 +359,8 @@ struct WifiDeviceMonitorView: View {
 //        .onChange(of: wifiLinkModel?.referencePower ?? 0) { (old, new) in
 //            monitor?.data.referenceRSSIAtOneMeter = new
 //        }
-//        .onChange(of: wifiLinkModel?.environmentalNoise ?? 0) { (old, new) in
-//            monitor?.data.smoothingFunc?.processNoise = new
+//        .onChange(of: wifiLinkModel?.processVariance ?? 0) { (old, new) in
+//            monitor?.data.smoothingFunc?.processVariance = new
 //        }
 //    }
 //    
@@ -375,7 +379,7 @@ struct WifiDeviceMonitorView: View {
 //                monitor!.data.rssiRawSamples = data.rssiRawSamples
 //                monitor!.data.smoothingFunc = WifiMonitor.initSmoothingFunc(
 //                    initialRSSI: monitor!.data.rssiRawSamples.first?.b ?? wifiLinkModel.referencePower,
-//                    processNoise: wifiLinkModel.environmentalNoise
+//                    processVariance: wifiLinkModel.processVariance
 //                )
 //
 //                WifiMonitor.recalculate(monitorData: monitor!.data)
@@ -425,7 +429,7 @@ struct WifiDeviceMonitorView: View {
 //                                    zoneId: zoneId,
 //                                    deviceId: selectedDevice.bssid,
 //                                    referencePower: selectedDevice.lastSeenRSSI,
-//                                    environmentalNoise: 0,
+//                                    processVariance: 0,
 //                                    maxDistance: 1.0,
 //                                    idleTimeout: 60,
 //                                    requireConnection: false)

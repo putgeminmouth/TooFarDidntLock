@@ -27,7 +27,7 @@ struct WifiLinkModel: Link, Equatable {
     var zoneId: UUID
     var deviceId: String
     var referencePower: Double
-    var environmentalNoise: Double
+    var processVariance: Double
     var maxDistance: Double
     var idleTimeout: TimeInterval?
     var requireConnection: Bool

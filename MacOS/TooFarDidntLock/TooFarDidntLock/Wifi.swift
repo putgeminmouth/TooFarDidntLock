@@ -183,8 +183,9 @@ class WifiMonitor: ObservableObject {
         }
     }
     
-    static func initSmoothingFunc(initialRSSI: Double, processNoise: Double = 0.1) -> KalmanFilter {
-        return KalmanFilter(initialState: initialRSSI, initialCovariance: 2.01, processNoise: processNoise, measurementNoise: 20.01)
+    static func initSmoothingFunc(initialRSSI: Double, processVariance: Double, measureVariance: Double) -> KalmanFilter {
+        return KalmanFilter(initialState: initialRSSI, initialCovariance: 2.01, processVariance: processVariance, measureVariance: measureVariance)
+//        return KalmanFilter(initialState: initialRSSI, initialCovariance: 2.01, processVariance: processVariance, measureVariance: 20.01)
     }
     
     private let wifiScanner: WifiScanner
@@ -230,7 +231,11 @@ class WifiMonitor: ObservableObject {
         for update in updates {
             for monitorData in monitors.filter{$0.deviceId == update.bssid}.map{$0.data} {
                 if monitorData.smoothingFunc == nil {
-                    monitorData.smoothingFunc = WifiMonitor.initSmoothingFunc(initialRSSI: update.lastSeenRSSI)
+                    monitorData.smoothingFunc = WifiMonitor.initSmoothingFunc(
+                        initialRSSI: update.lastSeenRSSI,
+                        processVariance: 0.1,
+                        measureVariance: 23.0
+                    )
                 }
                 
                 WifiMonitor.updateMonitorData(monitorData: monitorData, update: update)

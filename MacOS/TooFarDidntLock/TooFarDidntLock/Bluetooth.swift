@@ -279,9 +279,9 @@ class BluetoothMonitor: ObservableObject {
     
     static func initSmoothingFunc(
         initialRSSI: Double,
-        processNoise: Double = 0.1,
-        measurementNoise: Double = 0.1) -> KalmanFilter {
-            return KalmanFilter(initialState: initialRSSI, initialCovariance: 0.01, processNoise: processNoise, measurementNoise: measurementNoise)
+        processVariance: Double,
+        measureVariance: Double) -> KalmanFilter {
+            return KalmanFilter(initialState: initialRSSI, initialCovariance: 0.01, processVariance: processVariance, measureVariance: measureVariance)
         }
     
     private let bluetoothScanner: BluetoothScanner
@@ -328,7 +328,8 @@ class BluetoothMonitor: ObservableObject {
             if monitorData.smoothingFunc == nil {
                 monitorData.smoothingFunc = BluetoothMonitor.initSmoothingFunc(
                     initialRSSI: update.lastSeenRSSI,
-                    measurementNoise: 1.0)
+                    processVariance: BluetoothLinkModel.DefaultProcessVariance,
+                    measureVariance: BluetoothLinkModel.DefaultMeasureVariance)
             }
             
             BluetoothMonitor.updateMonitorData(monitorData: monitorData, update: update)

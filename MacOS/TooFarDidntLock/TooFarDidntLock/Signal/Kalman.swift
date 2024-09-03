@@ -5,33 +5,37 @@
  
  Measurement noise controls how much prediction is done more directly. If theres less noise, the prediction should match samples.
  With a lot of process/environmental noise, the prediction is less trusted, making the filter more reactive to pure measurements.
+ 
+ Measurement covariance: how much do measurements vary? how much do predictions need to allow for sharp changes? a non-noisy signal can still have a high (but regular) variance.
+ 
+ Values of 0 for variance seems to break things.
  */
 class KalmanFilter {
     var state: Double
     var covariance: Double
     
-    var processNoise: Double
+    var processVariance: Double
     
-    var measurementNoise: Double
+    var measureVariance: Double
     
-    init(initialState: Double, initialCovariance: Double, processNoise: Double, measurementNoise: Double) {
+    init(initialState: Double, initialCovariance: Double, processVariance: Double, measureVariance: Double) {
         self.state = initialState
         self.covariance = initialCovariance
-        self.processNoise = processNoise
-        self.measurementNoise = measurementNoise
+        self.processVariance = processVariance
+        self.measureVariance = measureVariance
     }
     
     func update(measurement: Double) -> Double {
         // Prediction update
         let predictedState = state
-        let predictedCovariance = covariance + processNoise
+        let predictedCovariance = covariance + processVariance
         
         // Measurement update
         let innovation = measurement - predictedState
-        let innovationCovariance = predictedCovariance + measurementNoise
+        let innovationCovariance = predictedCovariance + measureVariance
         
         // Kalman gain
-        let kalmanGain = predictedCovariance / innovationCovariance
+        let kalmanGain = predictedCovariance / (innovationCovariance != 0 ? innovationCovariance :  1)
         
         // Update state and covariance
         state = predictedState + kalmanGain * innovation

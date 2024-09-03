@@ -47,11 +47,15 @@ struct BluetoothLinkModel: Link, Equatable {
         return l.zoneId == r.zoneId && l.deviceId == r.deviceId
     }
     
+    static let DefaultProcessVariance = 1.0
+    static let DefaultMeasureVariance = 1.0
+    
     let id: UUID
     var zoneId: UUID
     var deviceId: UUID
     var referencePower: Double
-    var environmentalNoise: Double
+    var processVariance: Double
+    var measureVariance: Double
     var maxDistance: Double
     var idleTimeout: TimeInterval?
     var requireConnection: Bool
