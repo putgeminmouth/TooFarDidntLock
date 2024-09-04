@@ -35,9 +35,6 @@ class WifiScanner: ObservableObject, CWEventDelegate {
         
         // wifi networks don't update often, though it can take a few scans
         // to pick up new ones, so we try to balance here
-//        updateTimer = Timed(interval: 5, dispatch: WifiScanner.runloop.)
-//        updateTimerCancellable = updateTimer.sink{_ in self.onUpdateTimer()}
-//        updateTimerCancellable = WifiScanner.runloop.schedule(after: .init(.now()), interval: 1, {self.onUpdateTimer()})
 
         wifi.delegate = self
         try wifi.startMonitoringEvent(with: .bssidDidChange)
@@ -157,7 +154,7 @@ class WifiMonitor: ObservableObject {
 
         let smoothingFunc = monitorData.smoothingFunc!
 
-        let rssiSmoothedSample = smoothingFunc.update(measurement: monitorData.rssiRawSamples.last?.value ?? 0)
+        let rssiSmoothedSample = smoothingFunc.update(measurement: update.lastSeenRSSI)
         
         monitorData.rssiRawSamples = tail(monitorData.rssiRawSamples + [DataSample(update.lastSeenAt, update.lastSeenRSSI)])
         assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.date);\($0.1.date)"})")

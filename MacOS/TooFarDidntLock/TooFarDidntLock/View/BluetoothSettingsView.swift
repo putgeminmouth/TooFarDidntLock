@@ -57,7 +57,7 @@ struct BluetoothSettingsView: View {
 }
 
 struct BluetoothDeviceView: View {
-    @Binding var uuid: String?
+    @Binding var id: String?
     @Binding var name: String?
     @Binding var transmitPower: Double?
     @Binding var rssi: Double?
@@ -65,8 +65,10 @@ struct BluetoothDeviceView: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text("UUID: \(uuid ?? "00000000-0000-0000-0000-000000000000")")
             Text("Name: \(name ?? "")")
+                .font(.title)
+            Text("ID: \(id ?? "00000000-0000-0000-0000-000000000000")")
+                .font(.footnote)
             Text("Power: \(transmitPower ?? 0)")
             Text("RSSI: \(rssi ?? 0)")
             if let lastSeenAt = lastSeenAt { Text("Latency: \(lastSeenAt.distance(to: Date.now))s") }
@@ -95,7 +97,7 @@ struct BluetoothDevicesListView: View {
             let device = device.wrappedValue
             let row = HStack {
                 BluetoothDeviceView(
-                    uuid: Binding.constant(device.id.uuidString),
+                    id: Binding.constant(device.id.uuidString),
                     name: Binding.constant(device.name),
                     transmitPower: Binding.constant(device.transmitPower),
                     rssi: Binding.constant(device.lastSeenRSSI),
@@ -295,7 +297,7 @@ struct BluetoothLinkSettingsView: View {
                             nilMenuText: "Choose a Zone"
                         )
                         BluetoothDeviceView(
-                            uuid: Binding.constant(linkedDevice?.id.uuidString),
+                            id: Binding.constant(linkedDevice?.id.uuidString),
                             name: Binding.constant(linkedDevice?.name),
                             transmitPower: Binding.constant(linkedDevice?.transmitPower),
                             rssi: $linkedLastSeenRSSI,

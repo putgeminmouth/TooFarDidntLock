@@ -57,15 +57,17 @@ struct WifiSettingsView: View {
 }
 
 struct WifiDeviceView: View {
-    @Binding var uuid: String?
+    @Binding var bssid: String?
     @Binding var name: String?
     @Binding var rssi: Double?
     @Binding var lastSeenAt: Date?
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text("UUID: \(uuid ?? "00000000-0000-0000-0000-000000000000")")
             Text("Name: \(name ?? "")")
+                .font(.title)
+            Text("BSSID: \(bssid ?? "00000000-0000-0000-0000-000000000000")")
+                .font(.footnote)
             Text("RSSI: \(rssi ?? 0)")
             if let lastSeenAt = lastSeenAt { Text("Latency: \(lastSeenAt.distance(to: Date.now))s") }
         }
@@ -93,7 +95,7 @@ struct WifiDevicesListView: View {
             let device = device.wrappedValue
             let row = HStack {
                 WifiDeviceView(
-                    uuid: Binding.constant(device.bssid),
+                    bssid: Binding.constant(device.bssid),
                     name: Binding.constant(device.ssid),
                     rssi: Binding.constant(device.lastSeenRSSI),
                     lastSeenAt: Binding.constant(nil))
