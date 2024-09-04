@@ -9,6 +9,7 @@ struct WifiSettingsView: View {
 
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject var domainModel: DomainModel
+    @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
     @EnvironmentObject var wifiMonitor: WifiMonitor
 
     let emptyID = UUID().uuidString
@@ -18,12 +19,14 @@ struct WifiSettingsView: View {
     var body: some View {
         HStack {
             AvailableWifiDevicesSettingsView(selectedId: bindOpt($selectedId, emptyID))
-            if let monitorData = selectedMonitor?.data {
-                WifiDeviceMonitorView(
-                    monitorData: monitorData
+            if let monitor = selectedMonitor?.data {
+                SignalMonitorView(
+                    monitorData: monitor,
+                    availableChartTypes: Set(SignalMonitorView.ChartType.allCases),
+                    selectedChartTypes: Set([.rssiRaw, .rssiSmoothed])
                 )
                 // we want to force the view to recreate when changing data
-                .id(ObjectIdentifier(monitorData))
+                .id(ObjectIdentifier(monitor))
                 .frame(minHeight: 200)
             } else {
                 Text("Select a device")
@@ -39,14 +42,12 @@ struct WifiSettingsView: View {
             if new != emptyID {
                 selectedMonitor = wifiMonitor.startMonitoring(new)
 
-                // just for the UX, backfill with existing data
-                if let data = wifiMonitor.dataFor(deviceId: new).first,
-                   let firstSample = data.rssiRawSamples.first?.value {
-                    selectedMonitor!.data.rssiRawSamples = data.rssiRawSamples
+                if let state = runtimeModel.value.wifiStates.first{$0.bssid == new} {
+                    let firstSample = state.lastSeenRSSI
                     selectedMonitor!.data.smoothingFunc = WifiMonitor.initSmoothingFunc(
                         initialRSSI: firstSample,
-                        processVariance: 0.1,
-                        measureVariance: 23.0
+                        processVariance: 0.1,//BluetoothLinkModel.DefaultProcessVariance,
+                        measureVariance: 23.0//BluetoothLinkModel.DefaultMeasureVariance
                     )
                     WifiMonitor.recalculate(monitorData: selectedMonitor!.data)
                 }
@@ -135,121 +136,6 @@ struct AvailableWifiDevicesSettingsView: View {
             }
         }
         .frame(minWidth: 400, minHeight: 300)
-    }
-}
-
-struct WifiDeviceMonitorView: View {
-    enum ChartType: CaseIterable {
-        case rssiRaw
-        case rssiSmoothed
-        case distance
-    }
-
-    @State var monitorData: WifiMonitorData
-    @State var availableChartTypes = [ChartType]()
-    @State var linkedDeviceChartType: ChartType = .distance
-    
-    @State var chartTypeAdjustedSamples: LineChart.Samples = [:]
-    @State var chartTypeAdjustedYMin: Double = 0
-    @State var chartTypeAdjustedYMax: Double = 0
-    @State var chartTypeAdjustedYLastUpdated = Date()
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            Picker(selection: $linkedDeviceChartType, label: EmptyView()) {
-                ForEach(availableChartTypes, id: \.self) { type in
-                    switch type {
-                    case .rssiRaw:
-                        Text("Raw signal power (decibels)").tag(type)
-                    case .rssiSmoothed:
-                        Text("Smoothed signal power (decibels)").tag(type)
-                    case .distance:
-                        Text("Calculated Distance (meters)").tag(type)
-                    }
-                }
-            }
-            LineChart(
-                samples: $chartTypeAdjustedSamples,
-                xRange: 60,
-                yAxisMin: $chartTypeAdjustedYMin,
-                yAxisMax: $chartTypeAdjustedYMax)
-        }
-        .onReceive(monitorData.objectWillChange) { _ in
-            recalculate()
-            for (key, chartTypeAdjustedSample) in chartTypeAdjustedSamples {
-                if chartTypeAdjustedSample.count < 3 {
-                    let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
-                    chartTypeAdjustedYMin = Double.minimum(chartTypeAdjustedYMin, ymin)
-                    chartTypeAdjustedYMax = Double.maximum(chartTypeAdjustedYMax, ymax)
-                }
-            }
-        }
-        .onChange(of: linkedDeviceChartType) {
-            recalculate()
-            for (key, chartTypeAdjustedSample) in chartTypeAdjustedSamples {
-                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
-                chartTypeAdjustedYMin = Double.minimum(chartTypeAdjustedYMin, ymin)
-                chartTypeAdjustedYMax = Double.maximum(chartTypeAdjustedYMax, ymax)
-            }
-        }
-        .onAppear {
-            if monitorData.distanceSmoothedSamples != nil {
-                availableChartTypes = ChartType.allCases
-                linkedDeviceChartType = .distance
-            } else {
-                availableChartTypes = ChartType.allCases.filter{$0 != .distance}
-                linkedDeviceChartType = .rssiSmoothed
-            }
-        }
-    }
-    func calcBounds(_ samples: [DataSample]) -> (sampleMin: Double, sampleMax: Double, ymin: Double, ymax: Double) {
-        let stddev = samples.map{$0.value}.standardDeviation()
-        let sampleMin = samples.min(by: {$0.value < $1.value})?.value ?? 0
-        let sampleMax = samples.max(by: {$0.value < $1.value})?.value ?? 0
-        let ymin = sampleMin - stddev * 1
-        let ymax = sampleMax + stddev * 1
-        return (sampleMin: sampleMin, sampleMax: sampleMax, ymin: ymin, ymax: ymax)
-    }
-    func smoothInterpolateBounds(_ samples: [DataSample]) {
-        let (sampleMin, sampleMax, ymin, ymax) = calcBounds(samples)
-
-        let chartTypeAdjustedYShouldUpdate = chartTypeAdjustedYLastUpdated.distance(to: Date.now) > 5
-
-        if chartTypeAdjustedYShouldUpdate {
-            chartTypeAdjustedYLastUpdated = Date.now
-            let a = 0.5
-            let b = 1-a
-
-            chartTypeAdjustedYMin = chartTypeAdjustedYMin * a + ymin * b
-            chartTypeAdjustedYMax = chartTypeAdjustedYMax * a + ymax * b
-        }
-        chartTypeAdjustedYMin = min(sampleMin, chartTypeAdjustedYMin)
-        chartTypeAdjustedYMax = max(sampleMax, chartTypeAdjustedYMax)
-    }
-    func recalculate() {
-        if monitorData.distanceSmoothedSamples != nil {
-            availableChartTypes = ChartType.allCases
-        } else {
-            availableChartTypes = ChartType.allCases.filter{$0 != .distance}
-        }
-        for (key, _) in chartTypeAdjustedSamples {
-            switch linkedDeviceChartType {
-            case .rssiRaw:
-                let samples = monitorData.rssiRawSamples
-                smoothInterpolateBounds(samples)
-                chartTypeAdjustedSamples = [DataDesc("rssiRaw"): samples]
-            case .rssiSmoothed:
-                let samples = monitorData.rssiSmoothedSamples
-                smoothInterpolateBounds(samples)
-                chartTypeAdjustedSamples = [DataDesc("rssiSmoothed"): samples]
-            case .distance:
-                if let samples = monitorData.distanceSmoothedSamples {
-                    smoothInterpolateBounds(samples)
-                    chartTypeAdjustedYMin = max(0, chartTypeAdjustedYMin)
-                    chartTypeAdjustedSamples = [DataDesc("distance"): samples]
-                }
-            }
-        }
     }
 }
 

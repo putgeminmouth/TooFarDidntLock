@@ -154,3 +154,125 @@ struct LineChart: View {
         .border(Color.gray, width: 1)
     }
 }
+
+struct SignalMonitorView: View {
+    enum ChartType: CaseIterable {
+        case rssiRaw
+        case rssiSmoothed
+        case distance
+    }
+
+    @State var monitorData: any SignalMonitorData
+    @State var availableChartTypes: Set<ChartType>
+    @State var selectedChartTypes: Set<ChartType>
+    
+    @State private var chartSamples: LineChart.Samples = [:]
+    @State private var chartYMin: Double = 0
+    @State private var chartYMax: Double = 0
+    @State private var chartYLastUpdated = Date()
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Menu("Select data series") {
+                Toggle("All", isOn: bindSetToggle($selectedChartTypes, availableChartTypes))
+                    .toggleStyle(.button)
+                Divider()
+                if availableChartTypes.contains(.rssiRaw) {
+                    Toggle("Raw signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiRaw]))
+                        .toggleStyle(.checkbox)
+                }
+                if availableChartTypes.contains(.rssiSmoothed) {
+                    Toggle("Smoothed signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiSmoothed]))
+                        .toggleStyle(.checkbox)
+                }
+                if availableChartTypes.contains(.distance) {
+                    Toggle("Calculated Distance (meters)", isOn: bindSetToggle($selectedChartTypes, [.distance]))
+                        .toggleStyle(.checkbox)
+                }
+            }
+            LineChart(
+                samples: $chartSamples,
+                xRange: 60,
+                yAxisMin: $chartYMin,
+                yAxisMax: $chartYMax)
+        }
+        .onReceive($monitorData.wrappedValue.publisher) { _ in
+            recalculate()
+            chartYMin = Double.greatestFiniteMagnitude
+            chartYMax = -Double.greatestFiniteMagnitude
+            for (key, chartTypeAdjustedSample) in chartSamples {
+                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
+                chartYMin = Double.minimum(chartYMin, ymin)
+                chartYMax = Double.maximum(chartYMax, ymax)
+            }
+            if chartSamples.isEmpty {
+                chartYMin = 0
+                chartYMax = 1
+            }
+            assert(chartYMin <= chartYMax, "\(chartYMin) <= \(chartYMax)")
+        }
+        .onChange(of: selectedChartTypes) {
+            recalculate()
+            chartYMin = Double.greatestFiniteMagnitude
+            chartYMax = -Double.greatestFiniteMagnitude
+            for (key, chartTypeAdjustedSample) in chartSamples {
+                let (_, _, ymin, ymax) = calcBounds(chartTypeAdjustedSample)
+                chartYMin = Double.minimum(chartYMin, ymin)
+                chartYMax = Double.maximum(chartYMax, ymax)
+                
+            }
+            if chartSamples.isEmpty {
+                chartYMin = 0
+                chartYMax = 1
+            }
+            assert(chartYMin <= chartYMax, "\(chartYMin) <= \(chartYMax)")
+        }
+    }
+    func calcBounds(_ samples: [DataSample]) -> (sampleMin: Double, sampleMax: Double, ymin: Double, ymax: Double) {
+        let stddev = samples.map{$0.value}.standardDeviation()
+        let sampleMin = samples.min(by: {$0.value < $1.value})?.value ?? 0
+        let sampleMax = samples.max(by: {$0.value < $1.value})?.value ?? 0
+        let ymin = sampleMin - stddev * 1
+        let ymax = sampleMax + stddev * 1
+        return (sampleMin: sampleMin, sampleMax: sampleMax, ymin: ymin, ymax: ymax)
+    }
+    func smoothInterpolateBounds(_ samples: [DataSample]) {
+        let (sampleMin, sampleMax, ymin, ymax) = calcBounds(samples)
+
+        let chartTypeAdjustedYShouldUpdate = chartYLastUpdated.distance(to: Date.now) > 5
+
+        if chartTypeAdjustedYShouldUpdate {
+            chartYLastUpdated = Date.now
+            let a = 0.5
+            let b = 1-a
+
+            chartYMin = chartYMin * a + ymin * b
+            chartYMax = chartYMax * a + ymax * b
+        }
+        chartYMin = min(sampleMin, chartYMin)
+        chartYMax = max(sampleMax, chartYMax)
+    }
+    func recalculate() {
+        chartSamples = [:]
+        
+        let samples1 = monitorData.rssiRawSamples
+        if selectedChartTypes.contains(.rssiRaw) {
+            smoothInterpolateBounds(samples1)
+//            var chartTypeAdjustedSamples = LineChart.Samples()
+            chartSamples[DataDesc("rssiRaw")] = samples1
+        }
+        
+        if selectedChartTypes.contains(.rssiSmoothed) {
+            let samples2 = monitorData.rssiSmoothedSamples
+            smoothInterpolateBounds(samples2)
+            chartSamples[DataDesc("rssiSmoothed")] = samples2
+        }
+        
+        if selectedChartTypes.contains(.distance),
+           let samples3 = monitorData.distanceSmoothedSamples {
+            smoothInterpolateBounds(samples3)
+            chartYMin = max(0, chartYMin)
+            chartSamples[DataDesc("distance")] = samples3
+        }
+    }
+}

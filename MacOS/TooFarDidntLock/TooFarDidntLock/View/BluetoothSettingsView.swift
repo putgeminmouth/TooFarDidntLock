@@ -12,7 +12,7 @@ struct BluetoothSettingsView: View {
     @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
     @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
 
-    let emptyUUID = UUID()
+    let emptyID = UUID()
     @State var selectedId: UUID?
     @State var selectedMonitor: BluetoothMonitor.Monitored?
     
@@ -34,12 +34,12 @@ struct BluetoothSettingsView: View {
                     .border(Color.primary, width: 1)
             }
         }
-        .onChange(of: selectedId ?? emptyUUID) { (old, new: UUID) in
-            if old != emptyUUID {
+        .onChange(of: selectedId ?? emptyID) { (old, new: UUID) in
+            if old != emptyID {
                 selectedMonitor?.cancellable.cancel()
                 selectedMonitor = nil
             }
-            if new != emptyUUID {
+            if new != emptyID {
                 selectedMonitor = bluetoothMonitor.startMonitoring(new)
 
                 if let state = runtimeModel.value.bluetoothStates.first{$0.id == new} {
@@ -358,9 +358,9 @@ struct BluetoothLinkSettingsView: View {
                 }
                 
                 if let monitor = monitor {
-                    BluetoothDeviceMonitorView(
+                    SignalMonitorView(
                         monitorData: monitor.data,
-                        availableChartTypes: Set(BluetoothDeviceMonitorView.ChartType.allCases),
+                        availableChartTypes: Set(SignalMonitorView.ChartType.allCases),
                         selectedChartTypes: Set([.distance])
                     )
                 }
@@ -425,13 +425,16 @@ struct MaMa: View {
     @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
     @Binding var bluetoothLinkModel: OptionalModel<BluetoothLinkModel>
     @State var stateUpdates = ProxyPublisher<MonitoredPeripheral>(nil)
+    @State var monitor: BluetoothMonitor.Monitored?
     
     var body: some View {
         let bluetoothLinkModel = bluetoothLinkModel.value
 
-        EmptyView()
-            .onReceive(runtimeModel.value.bluetoothStateDidChange(id: {bluetoothLinkModel?.deviceId})) { update in
-            }
+        SignalMonitorView(
+            monitorData: monitor!.data,
+            availableChartTypes: Set(SignalMonitorView.ChartType.allCases),
+            selectedChartTypes: Set([.distance])
+        )
     }
 }
 

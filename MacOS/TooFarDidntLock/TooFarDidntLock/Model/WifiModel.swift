@@ -2,7 +2,11 @@ import SwiftUI
 import OSLog
 import Combine
 
-class WifiMonitorData: ObservableObject {
+class WifiMonitorData: SignalMonitorData, ObservableObject {
+    var publisher: AnyPublisher<(), Never> {
+        objectWillChange.eraseToAnyPublisher()
+    }
+
     @Published var rssiRawSamples = [DataSample]()
     @Published var rssiSmoothedSamples = [DataSample]()
     

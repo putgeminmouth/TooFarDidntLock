@@ -26,7 +26,11 @@ struct DataSample: Equatable, Hashable {
     }
 }
 
-class BluetoothMonitorData: ObservableObject {
+class BluetoothMonitorData: SignalMonitorData, ObservableObject {
+    var publisher: AnyPublisher<(), Never> {
+        objectWillChange.eraseToAnyPublisher()
+    }
+    
     @Published var rssiRawSamples = [DataSample]()
     @Published var rssiSmoothedSamples = [DataSample]()
     
