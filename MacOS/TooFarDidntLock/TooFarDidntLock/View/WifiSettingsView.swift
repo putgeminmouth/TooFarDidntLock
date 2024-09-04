@@ -22,7 +22,7 @@ struct WifiSettingsView: View {
             if let monitor = selectedMonitor?.data {
                 SignalMonitorView(
                     monitorData: monitor,
-                    availableChartTypes: Set(SignalMonitorView.ChartType.allCases),
+                    availableChartTypes: Set([.rssiRaw, .rssiSmoothed]),
                     selectedChartTypes: Set([.rssiRaw, .rssiSmoothed])
                 )
                 // we want to force the view to recreate when changing data
