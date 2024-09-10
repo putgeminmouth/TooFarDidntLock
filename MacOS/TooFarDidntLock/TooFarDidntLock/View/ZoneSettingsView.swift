@@ -100,6 +100,7 @@ struct ManualZoneListItemView: View {
 }
 
 struct WifiZoneListItemView: View {
+    @EnvironmentObject var advancedMode: EnvVar<Bool>
     @EnvironmentObject var zoneEvaluator: ZoneEvaluator
 
     @Binding var zone: WifiZone
@@ -112,10 +113,14 @@ struct WifiZoneListItemView: View {
                 .background(Color.gray.opacity(0.5))
                 .cornerRadius(4)
             Text("\(zone.name)")
-            Text(zone.ssid ?? "Unknown")
-                .italic(zone.ssid == nil)
-            Text(zone.bssid ?? "Unknown")
-                .italic(zone.ssid == nil)
+            if zone.name != zone.ssid || advancedMode.value {
+                Text(zone.ssid ?? "Unknown")
+                    .italic(zone.ssid == nil)
+            }
+            if advancedMode.value {
+                Text(zone.bssid ?? "Unknown")
+                    .italic(zone.ssid == nil)
+            }
             Spacer()
             ActiveIcon(active: bindFunc({zoneEvaluator.isActive(zone)}))
                 .help(zoneEvaluator.isActive(zone) ? "Zone is active" : "Zone is inactive")
@@ -177,6 +182,8 @@ struct ManualZoneEditView: View {
 }
 
 struct WifiZoneEditView: View {
+    @EnvironmentObject var advancedMode: EnvVar<Bool>
+    
     @Binding var zone: WifiZone
     var interfaces: [CWInterface]
     @State var onchange: (WifiZone) -> Void
@@ -204,9 +211,12 @@ struct WifiZoneEditView: View {
                     }
                 }
             }
-            LabeledView(horizontal: "BSSID") {
-                Text(zone.bssid ?? "Unknown")
-                    .italic(zone.ssid == nil)
+            
+            if advancedMode.value {
+                LabeledView(horizontal: "BSSID") {
+                    Text(zone.bssid ?? "Unknown")
+                        .italic(zone.ssid == nil)
+                }
             }
         }
         .onChange(of: zone) {

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct LinksSettingsView: View {
     @EnvironmentObject var domainModel: DomainModel
-
+    
     @State var zoneIdFilter: UUID? = nil
     @State var modalIsPresented = false
     @State var listSelection: UUID = UUID()

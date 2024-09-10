@@ -254,7 +254,7 @@ class BluetoothMonitor: ObservableObject {
         let rssiSmoothedSample = smoothingFunc.update(measurement: update.lastSeenRSSI)
         
         monitorData.rssiRawSamples = tail(monitorData.rssiRawSamples + [DataSample(update.lastSeenAt, update.lastSeenRSSI)])
-        assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.date);\($0.1.date)"})")
+        assert(monitorData.rssiRawSamples.count < 2 || zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date }, "\( zip(monitorData.rssiRawSamples, monitorData.rssiRawSamples.dropFirst()).map{"\($0.0.date.timeIntervalSince1970);\($0.1.date.timeIntervalSince1970)"})")
         
         monitorData.rssiSmoothedSamples = tail(monitorData.rssiSmoothedSamples + [DataSample(update.lastSeenAt, rssiSmoothedSample)])
         assert(monitorData.rssiSmoothedSamples.count < 2 || zip(monitorData.rssiSmoothedSamples, monitorData.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
@@ -277,13 +277,6 @@ class BluetoothMonitor: ObservableObject {
         }
     }
     
-    static func initSmoothingFunc(
-        initialRSSI: Double,
-        processVariance: Double,
-        measureVariance: Double) -> KalmanFilter {
-            return KalmanFilter(initialState: initialRSSI, initialCovariance: 0.01, processVariance: processVariance, measureVariance: measureVariance)
-        }
-    
     private let bluetoothScanner: BluetoothScanner
     private var cancellable: Cancellable? = nil
     private var monitors = [Monitor]()
@@ -293,23 +286,36 @@ class BluetoothMonitor: ObservableObject {
         cancellable = bluetoothScanner.didUpdate.sink { self.onBluetoothScannerUpdate($0) }
     }
     
-    func startMonitoring(_ id: UUID, referenceRSSIAtOneMeter: Double? = nil) -> Monitored {
-        let monitorId = UUID()
-        let monitor: Monitor = (
-            monitorId: monitorId,
-            deviceId: id,
-            data: BluetoothMonitorData()
-        )
-        if let referenceRSSIAtOneMeter = referenceRSSIAtOneMeter {
-            monitor.data.distanceSmoothedSamples = []
-            monitor.data.referenceRSSIAtOneMeter = referenceRSSIAtOneMeter
+    func startMonitoring(
+        _ id: UUID,
+        smoothing: (referenceRSSIAtOneMeter: Double, processNoise: Double, measureNoise: Double)? = nil) -> Monitored {
+            startMonitoring(id, smoothing: smoothing.map{s in {_ in s}})
         }
-        let cancellable = AnyCancellable {
-            self.monitors.removeAll{$0.monitorId == monitorId}
+    func startMonitoring(
+        _ id: UUID,
+        smoothing: ((BluetoothMonitorData) -> (referenceRSSIAtOneMeter: Double, processNoise: Double, measureNoise: Double))? = nil) -> Monitored {
+            let data = BluetoothMonitorData()
+            let monitorId = UUID()
+            let monitor: Monitor = (
+                monitorId: monitorId,
+                deviceId: id,
+                data: data
+            )
+            if let smoothing = smoothing.map{$0(data)} {
+                monitor.data.distanceSmoothedSamples = []
+                monitor.data.smoothingFunc = KalmanFilter(
+                    initialState: nil,
+                    initialCovariance: 0.01,
+                    processVariance: smoothing.processNoise,
+                    measureVariance: smoothing.measureNoise)
+                monitor.data.referenceRSSIAtOneMeter = smoothing.referenceRSSIAtOneMeter
+            }
+            let cancellable = AnyCancellable {
+                self.monitors.removeAll{$0.monitorId == monitorId}
+            }
+            monitors.append(monitor)
+            return (data: monitor.data, cancellable: cancellable)
         }
-        monitors.append(monitor)
-        return (data: monitor.data, cancellable: cancellable)
-    }
 
 //    func stopMonitoring(_ id: UUID) {
 //        monitors.removeAll{$0.monitorId == }
@@ -325,12 +331,7 @@ class BluetoothMonitor: ObservableObject {
         }
 
         for monitorData in monitors.filter{$0.deviceId == update.id}.map{$0.data} {
-            if monitorData.smoothingFunc == nil {
-                monitorData.smoothingFunc = BluetoothMonitor.initSmoothingFunc(
-                    initialRSSI: update.lastSeenRSSI,
-                    processVariance: BluetoothLinkModel.DefaultProcessVariance,
-                    measureVariance: BluetoothLinkModel.DefaultMeasureVariance)
-            }
+            assert(monitorData.smoothingFunc != nil)
             
             BluetoothMonitor.updateMonitorData(monitorData: monitorData, update: update)
         }

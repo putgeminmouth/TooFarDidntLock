@@ -4,14 +4,28 @@ import SwiftUI
 import OSLog
 import Combine
 //
-//class EnvVar<B: Equatable, Group>: Equatable, ObservableObject {
+class EnvVar<Value>: ObservableObject {
 //    static func == (lhs: EnvVar<B, Group>, rhs: EnvVar<B, Group>) -> Bool {
 //        return lhs.wrappedValue == rhs.wrappedValue
 //    }
-//    
+    static prefix func ! (env: EnvVar<Value>) -> Value {
+        return env.value
+    }
+
+    @Published var binding: Binding<Value>
+    var value: Value {
+        get { binding.wrappedValue }
+        set { binding.wrappedValue = newValue }
+    }
+
+    init(_ value: Binding<Value>) {
+        self.binding = value
+//        self.value = value
+    }
+    
 //    private let get: () -> B
 //    private let set: (B) -> Void
-//    
+    
 //    var wrappedValue: B {
 //        get { self.get() }
 //        set {
@@ -24,7 +38,7 @@ import Combine
 //        self.get = get
 //        self.set = set
 //    }
-//}
+}
 //
 //class EnvBinding<B: Equatable, Identifier>: Equatable, ObservableObject {
 //    static func == (lhs: EnvBinding<B, Identifier>, rhs: EnvBinding<B, Identifier>) -> Bool {
@@ -231,7 +245,7 @@ struct Debounced<T>: DynamicProperty {
             if cancellable == nil {
                 self.cancellable = timer.sink(receiveValue: {_ in self.debouncedValue = latestValue})
             }
-            if !timer.isActive() {
+            if !timer.isActive {
                 self.debouncedValue = latestValue
                 timer.start(interval: 1)
             }

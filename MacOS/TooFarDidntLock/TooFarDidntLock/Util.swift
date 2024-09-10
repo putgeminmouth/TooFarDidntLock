@@ -173,6 +173,10 @@ class Debouncer<Output>: Publisher {
 }
 
 extension Dictionary {
+    func map<T>(_ transform: @escaping (Self.Key, Self.Value) -> (Self.Key, T)) -> Dictionary<Self.Key, T> {
+        return Dictionary<Self.Key, T>(uniqueKeysWithValues: self.map{ transform($0.key, $0.value) })
+    }
+    
     func mergeRight(_ rhs: [Key: Value]) -> [Key: Value] {
         return self.merging(rhs) {(l,r) in r}
     }

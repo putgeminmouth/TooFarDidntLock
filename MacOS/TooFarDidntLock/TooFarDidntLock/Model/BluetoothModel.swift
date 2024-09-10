@@ -2,30 +2,6 @@ import SwiftUI
 import OSLog
 import Combine
 
-typealias DataDesc = String
-//struct DataDesc: Hashable {
-//    let label: String
-//    init(label: String) {
-//        self.label = label
-//    }
-//    init(_ label: String) {
-//        self.init(label: label)
-//    }
-//}
-
-struct DataSample: Equatable, Hashable {
-    let date: Date
-    let value: Double
-    
-    init(date: Date, value: Double) {
-        self.date = date
-        self.value = value
-    }
-    init(_ date: Date, _ value: Double) {
-        self.init(date: date, value: value)
-    }
-}
-
 class BluetoothMonitorData: SignalMonitorData, ObservableObject {
     var publisher: AnyPublisher<(), Never> {
         objectWillChange.eraseToAnyPublisher()

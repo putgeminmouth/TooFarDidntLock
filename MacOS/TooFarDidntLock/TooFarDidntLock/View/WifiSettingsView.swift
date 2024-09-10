@@ -57,6 +57,8 @@ struct WifiSettingsView: View {
 }
 
 struct WifiDeviceView: View {
+    @EnvironmentObject var advancedMode: EnvVar<Bool>
+    
     @Binding var bssid: String?
     @Binding var name: String?
     @Binding var rssi: Double?
@@ -66,10 +68,12 @@ struct WifiDeviceView: View {
         VStack(alignment: .leading) {
             Text("Name: \(name ?? "")")
                 .font(.title)
-            Text("BSSID: \(bssid ?? "00000000-0000-0000-0000-000000000000")")
-                .font(.footnote)
-            Text("RSSI: \(rssi ?? 0)")
-            if let lastSeenAt = lastSeenAt { Text("Latency: \(lastSeenAt.distance(to: Date.now))s") }
+            if advancedMode.value {
+                Text("BSSID: \(bssid ?? "00000000-0000-0000-0000-000000000000")")
+                    .font(.footnote)
+                Text("RSSI: \(rssi ?? 0)")
+                if let lastSeenAt = lastSeenAt { Text("Latency: \(lastSeenAt.distance(to: Date.now))s") }
+            }
         }
     }
 }

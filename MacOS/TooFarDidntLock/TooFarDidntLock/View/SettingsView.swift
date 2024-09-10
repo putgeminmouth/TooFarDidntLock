@@ -12,6 +12,8 @@ func formatMinSec(msec: Double) -> String {
 
 struct SettingsView: View {
     let logger = Log.Logger("SettingsView")
+    
+    @EnvironmentObject var advancedMode: EnvVar<Bool>
 
     @Binding var launchAtStartup: Bool
     @Binding var showSettingsAtStartup: Bool
@@ -43,6 +45,7 @@ struct SettingsView: View {
                 .tab(label: "Zones", icon: Icons.zone.toImage()) {
                     ZoneSettingsView()
                 },
+                ] + [
                 .divider,
                 .tab(label: "Wifi", icon: Icons.wifi.toImage()) {
                     WifiSettingsView()
@@ -50,7 +53,7 @@ struct SettingsView: View {
                 .tab(label: "Bluetooth", icon: Icons.bluetooth.toImage()) {
                     BluetoothSettingsView()
                 }
-            ]}
+                ].filter{_ in !advancedMode}}
         }
         
     }
@@ -58,6 +61,8 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     let logger = Log.Logger("GeneralSettingsView")
+    
+    @EnvironmentObject var advancedMode: EnvVar<Bool>
 
     @Binding var launchAtStartup: Bool
     @Binding var showSettingsAtStartup: Bool
@@ -70,6 +75,7 @@ struct GeneralSettingsView: View {
             Toggle("Launch at startup", isOn: $launchAtStartup)
             Toggle("Show this screen on startup", isOn: $showSettingsAtStartup)
             Toggle("Show in dock", isOn: $showInDock)
+            Toggle("Advanced Mode", isOn: $advancedMode.value)
             
             Divider()
                 .padding(20)
@@ -98,17 +104,13 @@ struct GeneralSettingsView: View {
 struct LineChart: View {
     typealias Samples = [DataDesc: [DataSample]]
     
-    @State var refreshViewTimer = Timed(interval: 2)
+    @State var refreshViewTimer = Timed(interval: 2).start()
+    @State var now: Date = Date()
     @Binding var samples: Samples
     @State var xRange: Int
     @Binding var yAxisMin: Double
     @Binding var yAxisMax: Double
     var body: some View {
-        // we want to keep the graph moving even if no new data points have come in
-        // this binds the view render to the timer updates
-        // TODO: is still working?
-        let _ = refreshViewTimer
-        let now = Date.now
         let xAxisMin = Calendar.current.date(byAdding: .second, value: -(xRange+1), to: now)!
         let xAxisMax = Calendar.current.date(byAdding: .second, value: 0, to: now)!
 
@@ -152,6 +154,11 @@ struct LineChart: View {
         .padding(.bottom, 5)
         .padding(.trailing, 5)
         .border(Color.gray, width: 1)
+        // we want to keep the graph moving even if no new data points have come in
+        // this binds the view render to the timer updates (`now` is just a convenient state)
+        .onReceive(refreshViewTimer) { _ in
+            now = Date()
+        }
     }
 }
 

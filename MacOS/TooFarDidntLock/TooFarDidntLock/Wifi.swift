@@ -194,23 +194,30 @@ class WifiMonitor: ObservableObject {
         cancellable = wifiScanner.didUpdate.sink { self.onWifiScannerUpdate($0) }
     }
     
-    func startMonitoring(_ bssid: String, referenceRSSIAtOneMeter: Double? = nil) -> Monitored {
-        let monitorId = UUID()
-        let monitor: Monitor = (
-            monitorId: monitorId,
-            deviceId: bssid,
-            data: WifiMonitorData()
-        )
-        if let referenceRSSIAtOneMeter = referenceRSSIAtOneMeter {
-            monitor.data.distanceSmoothedSamples = []
-            monitor.data.referenceRSSIAtOneMeter = referenceRSSIAtOneMeter
+    func startMonitoring(
+        _ bssid: String,
+        smoothing: (referenceRSSIAtOneMeter: Double, processNoise: Double, measureNoise: Double)? = nil) -> Monitored {
+            let monitorId = UUID()
+            let monitor: Monitor = (
+                monitorId: monitorId,
+                deviceId: bssid,
+                data: WifiMonitorData()
+            )
+            if let smoothing = smoothing {
+                monitor.data.distanceSmoothedSamples = []
+                monitor.data.smoothingFunc = KalmanFilter(
+                    initialState: nil,
+                    initialCovariance: 0.01,
+                    processVariance: smoothing.processNoise,
+                    measureVariance: smoothing.measureNoise)
+                monitor.data.referenceRSSIAtOneMeter = smoothing.referenceRSSIAtOneMeter
+            }
+            let cancellable = AnyCancellable {
+                self.monitors.removeAll{$0.monitorId == monitorId}
+            }
+            monitors.append(monitor)
+            return (data: monitor.data, cancellable: cancellable)
         }
-        let cancellable = AnyCancellable {
-            self.monitors.removeAll{$0.monitorId == monitorId}
-        }
-        monitors.append(monitor)
-        return (data: monitor.data, cancellable: cancellable)
-    }
 
 //    func stopMonitoring(_ id: UUID) {
 //        monitors.removeAll{$0.monitorId == }
@@ -231,7 +238,7 @@ class WifiMonitor: ObservableObject {
                     monitorData.smoothingFunc = WifiMonitor.initSmoothingFunc(
                         initialRSSI: update.lastSeenRSSI,
                         processVariance: 0.1,
-                        measureVariance: 23.0
+                        measureVariance: 1.0
                     )
                 }
                 

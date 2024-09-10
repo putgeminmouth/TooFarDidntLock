@@ -118,13 +118,6 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         }
         
         for link in domainModel.links {
-            let linkState = runtimeModel.linkStates.first{$0.id == link.id} as! BluetoothLinkState
-            let monitor = linkState.monitorData
-            if let smoothingFunc = monitor.data.smoothingFunc {
-                smoothingFunc.processVariance = link.processVariance
-                smoothingFunc.measureVariance = link.measureVariance
-            }
-
             // remember/cache linked-to devices. this is mainly for display purposes since the scan can
             // take a while to pick up a device or it may not currently be available
             if domainModel.wellKnownBluetoothDevices.first{$0.id == link.deviceId} == nil,
@@ -162,19 +155,6 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
                 return lhsName! < rhsName!
             }
         })
-    
-
-        // TODO: delete this, but double check first
-//        for link in domainModel.links {
-//            if link.requireConnection {
-//                if bluetoothScanner.connect(maintainConnectionTo: link.deviceId) != nil {
-//                    setLinked(link.id, true)
-//                } else {
-//                    logger.info("onBluetoothScannerUpdate: device not found on bluetooth update")
-//                    setLinked(link.id, false)
-//                }
-//            }
-//        }
     }
     
     func onBluetoothDidDisconnect(_ uuid: UUID) {
@@ -224,11 +204,9 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         }
         for a in added {
             assert(!runtimeModel.linkStates.contains{$0.id == a.id})
-            let monitor = bluetoothMonitor.startMonitoring(a.deviceId, referenceRSSIAtOneMeter: a.referencePower)
-            if let smoothingFunc = monitor.data.smoothingFunc {
-                smoothingFunc.processVariance = a.processVariance
-                smoothingFunc.measureVariance = a.measureVariance
-            }
+            let monitor = bluetoothMonitor.startMonitoring(
+                a.deviceId,
+                smoothing: (referenceRSSIAtOneMeter: a.referencePower, processNoise: a.processVariance, measureNoise: a.measureVariance))
 
             let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, monitorData: monitor)
             runtimeModel.linkStates.append(linkState)

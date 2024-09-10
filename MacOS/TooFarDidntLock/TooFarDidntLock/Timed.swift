@@ -24,7 +24,6 @@ class Timed: Cancellable, Publisher {
         self.notifier.receive(subscriber: subscriber)
     }
 
-
     @discardableResult
     func start(interval: Int) -> Timed {
         return self.start(interval: TimeInterval(interval))
@@ -41,10 +40,11 @@ class Timed: Cancellable, Publisher {
         assert((interval ?? self.interval) != nil)
         let itv = (interval ?? self.interval)!
         self.interval = itv
-        // TODO: we don't always want to on main, e.g. blocking call to fetch wifi
         self.publisher = Timer.publish(every: itv, tolerance: nil, on: dispatch, in: .common)
-        self.sink = self.publisher?.sink(receiveCompletion: {self.notifier.send(completion: $0)}, receiveValue: {self.notifier.send($0)})
-        self.cancellable = publisher?.connect()
+        self.sink = self.publisher?.autoconnect().sink(receiveValue: {
+            self.notifier.send($0)
+        })
+//        self.cancellable = publisher?.connect()
         return self
     }
     
@@ -68,7 +68,7 @@ class Timed: Cancellable, Publisher {
         self.stop()
     }
     
-    func isActive() -> Bool {
-        return self.cancellable != nil
+    var isActive: Bool {
+        self.cancellable != nil
     }
 }

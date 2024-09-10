@@ -11,6 +11,7 @@ struct TooFarDidntLockApp: App {
     @AppStorage("app.general.launchAtStartup") var launchAtStartup: Bool = false
     @AppStorage("app.general.showSettingsAtStartup") var showSettingsAtStartup: Bool = true
     @AppStorage("app.general.showInDock") var showInDock: Bool = true
+    @AppStorage("app.general.advancedMode") var advancedMode: Bool = false
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     // TODO: debounce by group
@@ -198,6 +199,7 @@ struct TooFarDidntLockApp: App {
             .environmentObject(NotObserved(runtimeModel))
             .environmentObject(bluetoothMonitor)
             .environmentObject(wifiMonitor)
+            .environmentObject(EnvVar($advancedMode))
         }
     }
 
