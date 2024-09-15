@@ -10,7 +10,9 @@ class Timed: Cancellable, Publisher {
     private var interval: TimeInterval?
     private var dispatch: RunLoop
     private var sink: Cancellable?
-    private var cancellable: Cancellable?
+//    private var cancellable: Cancellable?
+    
+    var lastValue: Output?
     
     init(interval: TimeInterval?, dispatch: RunLoop? = nil) {
         self.interval = interval
@@ -33,16 +35,23 @@ class Timed: Cancellable, Publisher {
         return self.start(interval: nil)
     }
     @discardableResult
-    func start(interval: TimeInterval?) -> Timed {
-        assert(self.cancellable == nil)
+    func start(interval: TimeInterval?, ttl: TimeInterval? = nil) -> Timed {
+//        assert(self.cancellable == nil)
         assert(self.publisher == nil)
         assert(self.sink == nil)
         assert((interval ?? self.interval) != nil)
         let itv = (interval ?? self.interval)!
         self.interval = itv
         self.publisher = Timer.publish(every: itv, tolerance: nil, on: dispatch, in: .common)
+        let startedAt = Date.now
         self.sink = self.publisher?.autoconnect().sink(receiveValue: {
-            self.notifier.send($0)
+            let isExpired = ttl.map{startedAt.distance(to: Date.now) > $0} ?? false
+            if isExpired {
+                self.stop()
+            } else {
+                self.lastValue = $0
+                self.notifier.send($0)
+            }
         })
 //        self.cancellable = publisher?.connect()
         return self
@@ -50,8 +59,8 @@ class Timed: Cancellable, Publisher {
     
     @discardableResult
     func stop() -> Timed {
-        self.cancellable?.cancel()
-        self.cancellable = nil
+//        self.cancellable?.cancel()
+//        self.cancellable = nil
         self.sink?.cancel()
         self.sink = nil
         self.publisher = nil
@@ -69,6 +78,6 @@ class Timed: Cancellable, Publisher {
     }
     
     var isActive: Bool {
-        self.cancellable != nil
+        self.sink != nil
     }
 }

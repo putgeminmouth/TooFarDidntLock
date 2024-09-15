@@ -23,7 +23,7 @@ class BaseLinkEvaluator: LinkEvaluator {
 
 class BluetoothLinkEvaluator: BaseLinkEvaluator {
     let logger = Log.Logger("BluetoothLinkEvaluator")
-
+    
     let bluetoothScanner: BluetoothScanner
     let bluetoothMonitor: BluetoothMonitor
     let updateTimer = Timed().start(interval: 1)
@@ -53,8 +53,8 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
     func setLinked(_ id: UUID, _ linked: Bool) {
         let newStateValue = linked ? Links.State.linked : Links.State.unlinked
         guard let link = domainModel.links.first{$0.id == id},
-              var linkState = runtimeModel.linkStates.first{$0.id == link.id},
-                  linkState.state != newStateValue
+        var linkState = runtimeModel.linkStates.first{$0.id == link.id},
+            linkState.state != newStateValue
         else { return }
         logger.info("Link \(id) status; linked=\(linked);")
         let oldState = linkState
@@ -73,29 +73,29 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
     func onUpdateLinkState(_ link: BluetoothLinkModel) {
         guard let linkState = runtimeModel.linkStates.first(where:{$0.id == link.id}) as? BluetoothLinkState
         else { return }
-
+        
         let now = Date.now
         let maxAgeSeconds: Double? = link.idleTimeout
-
+        
         var age: Double?
         var distance: Double?
         let peripheral = runtimeModel.bluetoothStates.first{$0.id == link.deviceId && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)}
         if let peripheral = peripheral  {
             age = peripheral.lastSeenAt.distance(to: now)
-
+            
             if let d = linkState.monitorData.data.distanceSmoothedSamples?.last {
                 distance = d.value
             }
         }
-
+        
         var linkActive = !(distance ?? 0 > link.maxDistance)
-
+        
         if linkActive {
             setLinked(link.id, true)
         } else {
             setLinked(link.id, false)
         }
-
+        
     }
     
     func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
@@ -124,11 +124,19 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let known = runtimeModel.bluetoothStates.first{$0.id == link.deviceId} {
                 domainModel.wellKnownBluetoothDevices.append(known)
             }
-
+            
             // conversely, ensure any cached devices are in the runtime list if they were not picked up by the scanner
             if runtimeModel.bluetoothStates.first{$0.id == link.deviceId} == nil,
             let known = domainModel.wellKnownBluetoothDevices.first{$0.id == link.deviceId} {
                 runtimeModel.bluetoothStates.append(known)
+            }
+        }
+        
+        // TODO: do this on a timer, or by subscribing to the monitor isntead
+        // we should stop assuming how the monitor gets its updates from the scanner's polling
+        for idx in domainModel.links.filter{$0.autoMeasureVariance}.indices {
+            if let linkState = runtimeModel.linkStates.first{$0.id == domainModel.links[idx].id} as? BluetoothLinkState {
+                Self.autoTuneMeasureVariance(model: &domainModel.links[idx], data: linkState.monitorData.data)
             }
         }
         
@@ -138,12 +146,12 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let rhsId = rhs.id
             let rhsName = rhs.name
             
-//            if domainModel.links.contains{$0.deviceId == lhsId} {
-//                return true
-//            }
-//            if domainModel.links.contains{$0.deviceId == rhsId} {
-//                return false
-//            }
+            //            if domainModel.links.contains{$0.deviceId == lhsId} {
+            //                return true
+            //            }
+            //            if domainModel.links.contains{$0.deviceId == rhsId} {
+            //                return false
+            //            }
             switch (lhsName, rhsName) {
             case (nil, nil):
                 return lhsId < rhsId
@@ -195,7 +203,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
                 smoothingFunc.processVariance = c.new.processVariance
                 smoothingFunc.measureVariance = c.new.measureVariance
             }
-
+            
             if c.old.requireConnection != c.new.requireConnection {
                 logger.info("link.requireConnection changed \(c.new.requireConnection): will disconnect \(c.new.deviceId) and reconnect in a moment as needed")
                 bluetoothScanner.disconnect(uuid: c.new.deviceId)
@@ -207,10 +215,10 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             let monitor = bluetoothMonitor.startMonitoring(
                 a.deviceId,
                 smoothing: (referenceRSSIAtOneMeter: a.referencePower, processNoise: a.processVariance, measureNoise: a.measureVariance))
-
+            
             let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, monitorData: monitor)
             runtimeModel.linkStates.append(linkState)
-
+            
             if a.requireConnection {
                 if bluetoothScanner.connect(maintainConnectionTo: a.deviceId) != nil {
                     setLinked(a.id, true)
@@ -223,6 +231,24 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             
             runtimeModel.linkStates.updateOrAppend({linkState}, where: {$0.id == linkState.id})
         }
+    }
+    
+    static func autoTuneMeasureVariance(model: inout BluetoothLinkModel, data: BluetoothMonitorData) {
+        // some idea that using 30 sec lagged data lets us be reactive if things were
+        // stable, but as soon as there is activity we get more conservative
+        let backHalf = DataSample.tail(data.rssiRawSamples, 30)
+        guard !backHalf.isEmpty else { return }
+        
+
+        var rawMax = backHalf.map{$0.value}.max()!
+        var rawMin = backHalf.map{$0.value}.min()!
+
+        var delta = abs(rawMax - rawMin) * 1.5
+
+        model.measureVariance = delta
+
+        data.smoothingFunc?.measureVariance = delta
+
     }
 }
 

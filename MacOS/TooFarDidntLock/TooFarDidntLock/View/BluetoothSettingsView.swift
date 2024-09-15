@@ -65,14 +65,17 @@ struct BluetoothDeviceView: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text("Name: \(name ?? "")")
-                .font(.title)
             if advancedMode.value {
+                Text("Name: \(name ?? "")")
+                    .font(.title)
                 Text("ID: \(id ?? "00000000-0000-0000-0000-000000000000")")
                     .font(.footnote)
                 Text("Power: \(transmitPower ?? 0)")
                 Text("RSSI: \(rssi ?? 0)")
                 if let lastSeenAt = lastSeenAt { Text("Latency: \(lastSeenAt.distance(to: Date.now))s") }
+            } else {
+                Text("\(name ?? "Unknown")")
+                    .font(.title)
             }
         }
     }
@@ -307,15 +310,14 @@ struct BluetoothLinkSettingsView: View {
     @State var linkedLastSeenRSSI: Double?
     @State var linkedLastSeenAt: Date?
     
-    var calibrationTimer = Timed(interval: 2)
-    @State var calibrationCancelable: AnyCancellable? = nil
-    
     var body: some View {
         let linkModel = bluetoothLinkModel.value!
         let linkedDevice = runtimeModel.value.bluetoothStates.first{$0.id == linkModel.deviceId}
         let linkedZone: Binding<UUID?> = bindOpt($bluetoothLinkModel,
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
+        let isNew = domainModel.links.first{$0.id == linkModel.id} == nil
+
         VStack(alignment: .leading) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading) {
@@ -323,7 +325,7 @@ struct BluetoothLinkSettingsView: View {
                             selectionCanStartNil: linkedZone,
                             nilMenuText: "Choose a Zone"
                         )
-                    HStack(alignment: .top) {
+                    HVStack(!advancedMode.value ? .vertical(.leading) : .horizontal(.top)) {
                         BluetoothDeviceView(
                             id: Binding.constant(linkedDevice?.id.uuidString),
                             name: Binding.constant(linkedDevice?.name),
@@ -333,14 +335,43 @@ struct BluetoothLinkSettingsView: View {
                         .padding(4)
                         .border(Color.gray, width: 1)
                         .cornerRadius(2)
-                        
-                        Button("", systemImage: "scope") {
-                            if calibrationTimer.isActive {
-                                calibrationTimer.stop()
-                            } else {
-                                calibrationTimer.start()
-                            }
-                        }.myButtonStyle()
+
+                        HVStack(advancedMode.value ? .vertical(.leading) : .horizontal(.center)) {
+                            CalibrateView(
+                                onStart: startCalibration,
+                                onUpdate: updateCalibration,
+                                duration: 60.0,
+                                isPresented: !advancedMode.value && isNew) { page in
+                                    if page == 0 {
+                                        VStack {
+                                            Image("Icons/Calibrate/calibrate_512_256_clear_0")
+                                            Text("Place the devices one meter apart, then Start.")
+                                                .font(.headline)
+                                            Text("The device's signal strength will be measured for up to a minute, allowing for more accurate distance estimation.")
+                                                .font(.body)
+                                                .wrappingMagic(lineLimit: 3)
+                                        }
+                                    } else {
+                                        VStack {
+                                            AnimatedImage(resources: [
+                                                "Icons/Calibrate/calibrate_512_256_clear_0",
+                                                "Icons/Calibrate/calibrate_512_256_clear_2",
+                                                "Icons/Calibrate/calibrate_512_256_clear_0",
+                                                "Icons/Calibrate/calibrate_512_256_clear_1",
+                                                "Icons/Calibrate/calibrate_512_256_clear_0",
+                                                "Icons/Calibrate/calibrate_512_256_clear_3",
+                                                "Icons/Calibrate/calibrate_512_256_clear_0",
+                                            ], delay: 2)
+                                            Text("Please wait...")
+                                                .font(.headline)
+                                            Text("You can stop at any time and still benefit from partial calibration.")
+                                                .font(.body)
+                                                .wrappingMagic(lineLimit: 1)
+                                        }
+                                    }
+                                }
+                            Text("Calibrate")
+                        }
                     }
                     if advancedMode.value {
                         LabeledDoubleSlider(
@@ -359,14 +390,23 @@ struct BluetoothLinkSettingsView: View {
                                            {$0.value!.processVariance=$1}),
                             in: 0.01...50,
                             format: {"\(String(format: "%.2f", $0))"})
-                        LabeledDoubleSlider(
-                            label: "Measure variance",
-                            description: "TODO",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.measureVariance ?? BluetoothLinkModel.DefaultMeasureVariance},
-                                           {$0.value!.measureVariance=$1}),
-                            in: 0.01...50,
-                            format: {"\(String(format: "%.2f", $0))"})
+                        HStack {
+                            Toggle(
+                                isOn: bindOpt($bluetoothLinkModel,
+                                              {$0?.autoMeasureVariance ?? advancedMode.value},
+                                              {$0.value!.autoMeasureVariance=$1}),
+                                label: {Image(systemName: "livephoto.badge.automatic")})
+                                .help("Auto tune")
+                            LabeledDoubleSlider(
+                                label: "Measure variance",
+                                description: "TODO",
+                                value: bindOpt($bluetoothLinkModel,
+                                               {$0?.measureVariance ?? BluetoothLinkModel.DefaultMeasureVariance},
+                                               {$0.value!.measureVariance=$1}),
+                                in: 0.01...50,
+                                format: {"\(String(format: "%.2f", $0))"})
+                            .disabled(bluetoothLinkModel.value?.autoMeasureVariance ?? false)
+                        }
                         LabeledDoubleSlider(
                             label: "Idle timeout",
                             description: "Device is considered absent if not found for too long, resulting in a screen lock. Unless you configure an active connection, both the host and target device will scan / broadcast at intervals that may vary e.g. due to low power settings. It is recommended to set at least 10-30 seconds.",
@@ -405,10 +445,12 @@ struct BluetoothLinkSettingsView: View {
                 }
                 
                 if let monitor = monitor {
+                    let available: Set<SignalMonitorView.ChartType> = advancedMode.value ? Set(SignalMonitorView.ChartType.allCases) : Set([.distance])
+                    let selected: Set<SignalMonitorView.ChartType> = advancedMode.value ? Set([.rssiRaw, .rssiSmoothed]) : Set([.distance])
                     SignalMonitorView(
                         monitorData: monitor.data,
-                        availableChartTypes: Set(SignalMonitorView.ChartType.allCases),
-                        selectedChartTypes: Set([.rssiRaw, .rssiSmoothed])
+                        availableChartTypes: available,
+                        selectedChartTypes: selected
                     )
                 }
             }
@@ -426,6 +468,14 @@ struct BluetoothLinkSettingsView: View {
             if update.lastSeenAt != linkedLastSeenAt {
                 linkedLastSeenAt = update.lastSeenAt
             }
+            
+            // since we use a disconnected monitor and link, we emulate what is done by the Link manager here
+            if let monitor = monitor,
+               bluetoothLinkModel.value != nil {
+                if bluetoothLinkModel.value!.autoMeasureVariance {
+                    BluetoothLinkEvaluator.autoTuneMeasureVariance(model: &(bluetoothLinkModel.value!), data: monitor.data)
+                }
+            }
         }
         .onChange(of: bluetoothLinkModel.value?.referencePower ?? 0) { (old, new) in
             monitor?.data.referenceRSSIAtOneMeter = new
@@ -436,60 +486,45 @@ struct BluetoothLinkSettingsView: View {
         .onChange(of: bluetoothLinkModel.value?.measureVariance ?? 0) { (old, new) in
             monitor?.data.smoothingFunc?.measureVariance = new
         }
-//        .onReceive(calibrationTimer) { time in
-//            calibrate()
-//        }
+        .onChange(of: bluetoothLinkModel.value?.measureVariance ?? 0) { (old, new) in
+            monitor?.data.smoothingFunc?.measureVariance = new
+        }
     }
     
-    func calibrate() {
-        func trunc10s(_ x: Double) -> Double {
-            Double(Int(x / 10) * 10)
-        }
-//            let linkedDevice = runtimeModel.value.bluetoothStates.first{$0.id == bluetoothLinkModel.deviceId}!
+    func startCalibration() {
+        bluetoothLinkModel.value?.measureVariance = 20
+        bluetoothLinkModel.value?.processVariance = 1
+    }
+
+    func updateCalibration(startedAt: Date, elapsed: TimeInterval) -> CalibrateView.Action {
         guard let monitor = monitor
-//                  let bluetoothLinkModel = bluetoothLinkModel.value
-        else { return }
+        else { return .stop }
+        guard elapsed < 60
+        else { return .stop }
+        guard !monitor.data.rssiRawSamples.isEmpty
+        else { return .continue }
+
         let data = monitor.data
-//        var rawBuckets = data.rssiRawSamples.reduce([Date: [DataSample]]()) { acc, next in
-//            var ret = acc
-//            let idx = Date(timeIntervalSince1970: trunc10s(next.date.timeIntervalSince1970))
-//            ret[idx] = (ret[idx] ?? []) + [next]
-//            return ret
-//        }
-        let backHalf = DataSample.tail(data.rssiRawSamples, 30)
-//        var rawAvg: [Date: Double] = rawBuckets.mapValues{$0.reduce(0.0){acc,next in acc+next.value}/Double($0.count)}
-//        var rawAmp: [Date: Double] = rawBuckets.map { (key, value) in
-//            let minValue = value.map{$0.value}.min()!
-//            let maxValue = value.map{$0.value}.max()!
-//            return (key, abs(maxValue - minValue))
-//        }
-        var rawMax = backHalf.reduce(-1000) { acc, next in max(acc, next.value) }
-        var rawMin = backHalf.reduce(1000) { acc, next in min(acc, next.value) }
-//        var smoothBuckets = data.rssiSmoothedSamples.reduce([Date: [DataSample]]()) { acc, next in
-//            var ret = acc
-//            let idx = Date(timeIntervalSince1970: trunc10s(next.date.timeIntervalSince1970))
-//            ret[idx] = (ret[idx] ?? []) + [next]
-//            return ret
-//        }
-//        var smoothAvg = smoothBuckets.mapValues{$0.reduce(0.0){acc,next in acc+next.value}/Double($0.count)}
+
+        // calc avg even if sample data doesn't meet all requirements, best effort
+        // ideally we continue until more data is available though
+        if let avg = data.rssiSmoothedSamples.map{$0.value}.average() {
+            bluetoothLinkModel.value?.referencePower = avg
+        }
+
+        guard data.rssiRawSamples.count > 1
+        else { return .continue }
         
-//        assert(rawBuckets.keys == smoothBuckets.keys, "\(rawBuckets.keys) == \(smoothBuckets.keys)")
-//        var delta = Array(rawAvg.values).average() - Array(smoothAvg.values).average()
-        var delta = abs(rawMax - rawMin) * 1.5
-        print("delta=\(delta)")
-        var testVariance = delta
-        bluetoothLinkModel.value?.measureVariance = delta
-//        var testFilter = KalmanFilter(
-//            initialState: data.smoothingFunc!.state,
-//            initialCovariance: data.smoothingFunc!.covariance,
-//            processVariance: data.smoothingFunc!.processVariance,
-//            measureVariance: testVariance)
-        data.smoothingFunc?.measureVariance = delta
-//        if let last = data.rssiRawSamples.last {
-//            let s = DataSample(last.date, data.smoothingFunc!.update(measurement: last.value))
-//            data.rssiSmoothedSamples.append(s)
-//        }
-//        data.rssiSmoothedSamples = testSamples
+        let now = Date.now
+        guard let maxDate = data.rssiSmoothedSamples.map{$0.date.distance(to: Date.now)}.max(),
+            let minDate = data.rssiSmoothedSamples.map{$0.date.distance(to: Date.now)}.min()
+        else { return .continue }
+        
+        guard let last = data.rssiSmoothedSamples.last
+        else { return .continue}
+        
+        let ret: CalibrateView.Action = startedAt.distance(to: last.date) > 30 ? .stop : .continue
+        return ret
     }
     
     func onAppear() {
@@ -515,6 +550,7 @@ struct BluetoothLinkSettingsView: View {
 
                 BluetoothMonitor.recalculate(monitorData: monitor!.data)
             }
+            
         } else {
             let linkState = runtimeModel.value.linkStates.first{$0.id == linkModel.id} as! BluetoothLinkState
             monitor!.data.rssiRawSamples = linkState.monitorData.data.rssiRawSamples
@@ -522,55 +558,69 @@ struct BluetoothLinkSettingsView: View {
             monitor!.data.distanceSmoothedSamples = linkState.monitorData.data.distanceSmoothedSamples
             monitor!.data.smoothingFunc = linkState.monitorData.data.smoothingFunc
         }
-        
-        calibrationCancelable = calibrationTimer.sink(receiveValue: {_ in self.calibrate()})
-
     }
 }
 
-struct Test: View {
-
-    @Environment(\.scenePhase) var scenePhase
-    @EnvironmentObject var domainModel: DomainModel
-    @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
-    @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
-    @EnvironmentObject var advancedMode: EnvVar<Bool>
-
-    // TODO: i think this is optional because its easier to pass the binding?
-    // technically this should never be empty
-    @Binding var bluetoothLinkModel: OptionalModel<BluetoothLinkModel>
-    // We use a dedicated monitor in this view instead of the link's or another existing monitor
-    // because we want the view to react live without impact to changes in the view without having to save
-    @State var monitor: BluetoothMonitor.Monitored?
-    
-    @State var linkedLastSeenRSSI: Double?
-    @State var linkedLastSeenAt: Date?
-    
-    var calibrationTimer = Timed(interval: 2)
-    @State var calibrationCancelable: AnyCancellable? = nil
-    
-    var body: some View {
-        let linkModel = bluetoothLinkModel.value!
-        let linkedDevice = runtimeModel.value.bluetoothStates.first{$0.id == linkModel.deviceId}
-        let linkedZone: Binding<UUID?> = bindOpt($bluetoothLinkModel,
-                                                 {$0?.zoneId},
-                                                 {$0.value?.zoneId = $1!})
-        VStack(alignment: .leading) {
-            Picker("Max distance",
-                   selection: Binding<Distance>(get: {Distance.fromMeters(linkModel.maxDistance)},
-                                                set: {bluetoothLinkModel.value?.maxDistance = $0.toMeters()})) {
-                Button("") {
-                    
-                }
-            }
-       }
-   }
-}
+//struct Test: View {
+//
+//    @Environment(\.scenePhase) var scenePhase
+//    @EnvironmentObject var domainModel: DomainModel
+//    @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
+//    @EnvironmentObject var bluetoothMonitor: BluetoothMonitor
+//    @EnvironmentObject var advancedMode: EnvVar<Bool>
+//
+//    // TODO: i think this is optional because its easier to pass the binding?
+//    // technically this should never be empty
+//    @Binding var bluetoothLinkModel: OptionalModel<BluetoothLinkModel>
+//    // We use a dedicated monitor in this view instead of the link's or another existing monitor
+//    // because we want the view to react live without impact to changes in the view without having to save
+//    @State var monitor: BluetoothMonitor.Monitored?
+//    
+//    @State var linkedLastSeenRSSI: Double?
+//    @State var linkedLastSeenAt: Date?
+//    
+//    var body: some View {
+//        let linkModel = bluetoothLinkModel.value!
+//        let linkedDevice = runtimeModel.value.bluetoothStates.first{$0.id == linkModel.deviceId}
+//        let linkedZone: Binding<UUID?> = bindOpt($bluetoothLinkModel,
+//                                                 {$0?.zoneId},
+//                                                 {$0.value?.zoneId = $1!})
+//        let isNew = domainModel.links.first{$0.id == linkModel.id} == nil
+//        
+//        CalibrateView(
+//            onStart: {},
+//            onUpdate: {_ in .stop},
+//            duration: 60.0,
+//            autoStart: !advancedMode.value && isNew) { page in
+//                if page == 0 {
+//                    VStack {
+//                        Image("Icons/Calibrate/calibrate_512_256_clear_0")
+//                        Text("Place the devices one meter apart to measure the device's signal strength.")
+//                    }
+//                } else {
+//                    VStack {
+//                        AnimatedImage(resources: [
+//                            "Icons/Calibrate/calibrate_512_256_clear_0",
+//                            "Icons/Calibrate/calibrate_512_256_clear_2",
+//                            "Icons/Calibrate/calibrate_512_256_clear_0",
+//                            "Icons/Calibrate/calibrate_512_256_clear_1",
+//                            "Icons/Calibrate/calibrate_512_256_clear_0",
+//                            "Icons/Calibrate/calibrate_512_256_clear_3",
+//                            "Icons/Calibrate/calibrate_512_256_clear_0",
+//                        ], delay: 2)
+//                        Text("Please wait... the signal is being continuously measured so you can stop at any time and still keep less accurate results.")
+//                    }
+//                }
+//            }
+//        Text("Calibrate")
+//    }
+//}
 
 struct EditBluetoothDeviceLinkModal: View {
     
     @EnvironmentObject var domainModel: DomainModel
     @EnvironmentObject var runtimeModel: NotObserved<RuntimeModel>
+    @EnvironmentObject var advancedMode: EnvVar<Bool>
 
     let zoneId: UUID
     @State var itemBeingEdited = OptionalModel<BluetoothLinkModel>(value: nil)
@@ -604,6 +654,7 @@ struct EditBluetoothDeviceLinkModal: View {
                                     referencePower: selectedDevice.lastSeenRSSI,                                    
                                     processVariance: BluetoothLinkModel.DefaultProcessVariance,
                                     measureVariance: BluetoothLinkModel.DefaultMeasureVariance,
+                                    autoMeasureVariance: advancedMode.value,
                                     maxDistance: 1.0,
                                     idleTimeout: 60,
                                     requireConnection: false)

@@ -200,6 +200,7 @@ struct TooFarDidntLockApp: App {
             .environmentObject(bluetoothMonitor)
             .environmentObject(wifiMonitor)
             .environmentObject(EnvVar($advancedMode))
+//            .preferredColorScheme(.light)
         }
     }
 

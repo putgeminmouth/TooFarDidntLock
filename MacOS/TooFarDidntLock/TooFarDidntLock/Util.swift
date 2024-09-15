@@ -95,8 +95,8 @@ extension Array where Element == Double {
         return sortedData[index]
     }
     
-    func average() -> Double {
-        guard count > 0 else { return 0 }
+    func average() -> Double? {
+        guard count > 0 else { return nil }
         let avg = self.reduce(0, +) / Double(self.count)
         return avg
     }

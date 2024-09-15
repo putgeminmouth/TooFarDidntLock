@@ -23,8 +23,7 @@ class KalmanFilter {
         self.state = initialState
         self.covariance = initialCovariance
         self.processVariance = processVariance
-        self._measureVariance = measureVariance
-        _id = ObjectIdentifier(self)
+        self.measureVariance = measureVariance
     }
     
     func update(measurement: Double) -> Double {

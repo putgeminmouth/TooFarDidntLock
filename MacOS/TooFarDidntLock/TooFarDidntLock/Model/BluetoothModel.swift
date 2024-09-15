@@ -36,6 +36,7 @@ struct BluetoothLinkModel: Link, Equatable {
     var referencePower: Double
     var processVariance: Double
     var measureVariance: Double
+    var autoMeasureVariance: Bool
     var maxDistance: Double
     var idleTimeout: TimeInterval?
     var requireConnection: Bool

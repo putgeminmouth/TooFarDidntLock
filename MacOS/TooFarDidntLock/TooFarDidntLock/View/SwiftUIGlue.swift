@@ -243,7 +243,7 @@ struct Debounced<T>: DynamicProperty {
         get { latestValue }
         nonmutating set {
             if cancellable == nil {
-                self.cancellable = timer.sink(receiveValue: {_ in self.debouncedValue = latestValue})
+                self.cancellable = timer.sink(receiveCompletion: {_ in}, receiveValue: {_ in self.debouncedValue = latestValue})
             }
             if !timer.isActive {
                 self.debouncedValue = latestValue
@@ -332,6 +332,30 @@ extension View {
     }
 }
 
+struct PulseModifier: ViewModifier {
+    @State var isAnimate = false
+    @State var timer = Timed().start(interval: 1, ttl: 2)
+    @State var test: Int = 0
+    
+    func body(content: Content) -> some View {
+        let _ = timer
+        content
+            .background(timer.isActive ? [.red,.clear][test % 2] : .clear)
+            .onReceive(timer) { _ in
+                test += 1
+            }
+    }
+}
+extension View {
+    func pulse() -> some View {
+        self.modifier(PulseModifier())
+    }
+//    func pulse() -> some View {
+//        self
+//            .border(.red, width: 2)
+//    }
+}
+
 func estimateTextSize(text: String, font: NSFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)) -> CGSize {
     let attributes = [NSAttributedString.Key.font: font]
     let size = (text as NSString).size(withAttributes: attributes)
@@ -354,5 +378,21 @@ extension Slider<EmptyView, EmptyView> {
         let dStep: Double = Double(step)
 
         self.init(value: dValue, in: dBounds, step: dStep)
+    }
+}
+
+extension View {
+    func onAppear(perform: @escaping (Self) -> Void) -> Self {
+        perform(self)
+        return self
+    }
+}
+
+extension Text {
+    func wrappingMagic(lineLimit: Int) -> some View {
+        return self
+        .lineLimit(lineLimit)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(idealWidth: 0, idealHeight: 0)
     }
 }

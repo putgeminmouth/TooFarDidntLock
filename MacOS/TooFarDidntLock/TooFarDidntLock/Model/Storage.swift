@@ -166,6 +166,7 @@ extension BluetoothLinkModel: DictionaryRepresentable {
               let maximumDistance = (dict["maximumDistance"] as? NSNumber)?.doubleValue,
               let processVariance = (dict["processVariance"] as? NSNumber)?.doubleValue,
               let measureVariance = (dict["measureVariance"] as? NSNumber)?.doubleValue,
+              let autoMeasureVariance = dict["autoMeasureVariance"] as? Bool,
               let idleTimeout = (dict["idleTimeout"] as? NSNumber)?.doubleValue,
               let requireConnection = dict["requireConnection"] as? Bool
         else { return nil }
@@ -176,6 +177,7 @@ extension BluetoothLinkModel: DictionaryRepresentable {
             referencePower: referencePower,
             processVariance: processVariance,
             measureVariance: measureVariance,
+            autoMeasureVariance: autoMeasureVariance,
             maxDistance: maximumDistance,
             idleTimeout: idleTimeout,
             requireConnection: requireConnection
