@@ -1,6 +1,10 @@
 import SwiftUI
 import Combine
 
+// we keep a bit more than we show to allow smoothing the display edges
+// TODO: centralize this and the 60s used elsewhere
+let signalDataRetentionPeriod: TimeInterval = 100
+
 typealias DataDesc = String
 
 struct DataSample: Equatable, Hashable {

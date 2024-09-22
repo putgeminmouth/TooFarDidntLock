@@ -19,6 +19,7 @@ class BluetoothMonitorData: SignalMonitorData, ObservableObject {
 struct BluetoothLinkState: LinkState {
     let id: UUID
     var state: Links.State
+    var stateChangedHistory: [Date]
     var monitorData: BluetoothMonitor.Monitored
 }
 
@@ -29,6 +30,7 @@ struct BluetoothLinkModel: Link, Equatable {
     
     static let DefaultProcessVariance = 1.0
     static let DefaultMeasureVariance = 1.0
+    static let DefaultLinkStateDebounce = 20.0
     
     let id: UUID
     var zoneId: UUID
@@ -38,8 +40,9 @@ struct BluetoothLinkModel: Link, Equatable {
     var measureVariance: Double
     var autoMeasureVariance: Bool
     var maxDistance: Double
-    var idleTimeout: TimeInterval?
+    var idleTimeout: TimeInterval
     var requireConnection: Bool
+    var linkStateDebounce: TimeInterval
 }
 
 struct BluetoothDevice: Equatable {

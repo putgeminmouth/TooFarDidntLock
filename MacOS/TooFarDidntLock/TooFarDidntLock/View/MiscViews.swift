@@ -282,19 +282,41 @@ struct CalibrateView/*<Content: View>*/: View {
 struct LineChart: View {
     typealias Samples = [DataDesc: [DataSample]]
     
-    @State var refreshViewTimer = Timed(interval: 2).start()
+    @State var refreshViewTimer = Timed(interval: 1).start()
     @State var now: Date = Date()
     @Binding var samples: Samples
     @State var xRange: Int
     @Binding var yAxisMin: Double
     @Binding var yAxisMax: Double
+    @Binding var ruleMarks: [Date]
     var body: some View {
         let xAxisMin = Calendar.current.date(byAdding: .second, value: -(xRange+1), to: now)!
         let xAxisMax = Calendar.current.date(byAdding: .second, value: 0, to: now)!
 
         let filteredSamples: [(key: DataDesc, value: [DataSample])] = samples
-            .mapValues{$0.filter{$0.date > xAxisMin}}
+            // data can be sparse, e.g. because bluetooth scanner updates are unpredictable
+            // so try and interpolate from out of bounds data when available, for a nicer graph
+            .mapValues{
+                var samples = $0
+                
+                let inBounds = samples.filter{$0.date >= xAxisMin}
+                let outBounds = samples.filter{$0.date < xAxisMin}
+                if let firstIn = inBounds.first,
+                   let lastOut = outBounds.last {
+                    let dx = lastOut.date.distance(to: firstIn.date)
+                    let dy = firstIn.value - lastOut.value
+                    let slope = dy/dx
+                    let lerpX = lastOut.date.distance(to: xAxisMin)
+                    let lerpY = lastOut.value + lerpX * slope
+                    samples = [DataSample(xAxisMin, lerpY)] + samples
+                }
+                return samples
+            }
+            .mapValues{$0.filter{$0.date >= xAxisMin}}
             .sorted(by: {$0.key < $1.key})
+        
+        let filteredRuleMarks = ruleMarks
+            .filter{$0 > xAxisMin}
         
         Chart {
             ForEach(Binding.constant(filteredSamples.map{(key: $0.key, value: $0.value)}), id: \.wrappedValue.key) {
@@ -308,6 +330,10 @@ struct LineChart: View {
                             .foregroundStyle(by: .value("", filteredSampleKey.lowercased()))
                         PointMark(x: .value("t", sample.date), y: .value("", sample.value))
                             .symbolSize(10)
+                    }
+                    
+                    ForEach(filteredRuleMarks, id: \.self) { mark in
+                        RuleMark(x: .value("t", mark))
                     }
                 }
             }
@@ -342,8 +368,7 @@ struct LineChart: View {
 
 struct SignalMonitorView: View {
     enum ChartType: CaseIterable {
-        case rssiRaw
-        case rssiSmoothed
+        case rssi
         case distance
     }
 
@@ -355,6 +380,7 @@ struct SignalMonitorView: View {
     @State private var chartYMin: Double = 0
     @State private var chartYMax: Double = 0
     @State private var chartYLastUpdated = Date()
+    @Binding var ruleMarks: [Date]
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -363,12 +389,8 @@ struct SignalMonitorView: View {
                     Toggle("All", isOn: bindSetToggle($selectedChartTypes, availableChartTypes))
                         .toggleStyle(.button)
                     Divider()
-                    if availableChartTypes.contains(.rssiRaw) {
-                        Toggle("Raw signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiRaw]))
-                            .toggleStyle(.checkbox)
-                    }
-                    if availableChartTypes.contains(.rssiSmoothed) {
-                        Toggle("Smoothed signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssiSmoothed]))
+                    if availableChartTypes.contains(.rssi) {
+                        Toggle("Signal power (decibels)", isOn: bindSetToggle($selectedChartTypes, [.rssi]))
                             .toggleStyle(.checkbox)
                     }
                     if availableChartTypes.contains(.distance) {
@@ -381,8 +403,13 @@ struct SignalMonitorView: View {
                 samples: $chartSamples,
                 xRange: 60,
                 yAxisMin: $chartYMin,
-                yAxisMax: $chartYMax)
+                yAxisMax: $chartYMax,
+                ruleMarks: $ruleMarks
+            )
         }
+
+        // is one better than the other?
+//        .onReceive(monitorData.objectWillChange) { _ in
         .onReceive($monitorData.wrappedValue.publisher) { _ in
             recalculate()
             chartYMin = Double.greatestFiniteMagnitude
@@ -443,18 +470,15 @@ struct SignalMonitorView: View {
         chartSamples = [:]
         
         let samples1 = monitorData.rssiRawSamples
-        if selectedChartTypes.contains(.rssiRaw) {
+        if selectedChartTypes.contains(.rssi) {
             smoothInterpolateBounds(samples1)
-//            var chartTypeAdjustedSamples = LineChart.Samples()
             chartSamples[DataDesc("rssiRaw")] = samples1
+
+            let samplesSmoothed = monitorData.rssiSmoothedSamples
+            smoothInterpolateBounds(samplesSmoothed)
+            chartSamples[DataDesc("rssiSmoothed")] = samplesSmoothed
         }
-        
-        if selectedChartTypes.contains(.rssiSmoothed) {
-            let samples2 = monitorData.rssiSmoothedSamples
-            smoothInterpolateBounds(samples2)
-            chartSamples[DataDesc("rssiSmoothed")] = samples2
-        }
-        
+                
         if selectedChartTypes.contains(.distance),
            let samples3 = monitorData.distanceSmoothedSamples {
             smoothInterpolateBounds(samples3)

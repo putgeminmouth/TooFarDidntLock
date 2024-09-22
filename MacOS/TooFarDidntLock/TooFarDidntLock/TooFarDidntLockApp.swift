@@ -220,7 +220,7 @@ struct TooFarDidntLockApp: App {
         doLock()
     }
     func doLock() {
-        guard !isScreenLocked
+        guard !isScreenLocked || !lockingEnabled
         else { return }
         
         let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/login", RTLD_NOW)
@@ -233,7 +233,7 @@ struct TooFarDidntLockApp: App {
         }
     }
     func doUnLock() {
-        guard isScreenLocked
+        guard isScreenLocked || !lockingEnabled
         else { return }
         
         appDelegate.statusBarDelegate.setMenuIcon("MenuIcon_Neutral")

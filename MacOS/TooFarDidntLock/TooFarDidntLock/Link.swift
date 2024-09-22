@@ -22,7 +22,8 @@ class BaseLinkEvaluator: LinkEvaluator {
 }
 
 class BluetoothLinkEvaluator: BaseLinkEvaluator {
-    let logger = Log.Logger("BluetoothLinkEvaluator")
+    static let logger = Log.Logger("BluetoothLinkEvaluator")
+    let logger = BluetoothLinkEvaluator.logger
     
     let bluetoothScanner: BluetoothScanner
     let bluetoothMonitor: BluetoothMonitor
@@ -46,40 +47,61 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             .store(in: &cancellables)
         
         updateTimer
-            .sink{_ in self.onUpdateLinkState()}
+            .sink{_ in self.onLinkStateUpdateTimer()}
             .store(in: &cancellables)
     }
     
-    func setLinked(_ id: UUID, _ linked: Bool) {
-        let newStateValue = linked ? Links.State.linked : Links.State.unlinked
+    private func setLinked(_ id: UUID, _ linked: Bool) {
         guard let link = domainModel.links.first{$0.id == id},
-        var linkState = runtimeModel.linkStates.first{$0.id == link.id},
-            linkState.state != newStateValue
+        let oldState = runtimeModel.linkStates.first(where: {$0.id == link.id}).map({$0 as! BluetoothLinkState})
         else { return }
-        logger.info("Link \(id) status; linked=\(linked);")
-        let oldState = linkState
-        var newState = linkState
-        newState.state = newStateValue
+        guard let newState = Self.updatedLinkWithState(id, linked, oldState)
+        else { return }
         
+        logger.info("Link \(id) status; linked=\(linked);")
         runtimeModel.linkStates.updateOrAppend(newState, where: {$0.id == id})
         linkStateDidChange.send((data: link, oldState: oldState as LinkState, newState: newState as LinkState))
     }
     
-    func onUpdateLinkState() {
+    static private func updatedLinkWithState(_ id: UUID, _ linked: Bool, _ oldState: BluetoothLinkState) -> BluetoothLinkState? {
+        let newStateValue = linked ? Links.State.linked : Links.State.unlinked
+        guard oldState.state != newStateValue
+        else { return nil }
+        
+        var newState = oldState
+        newState.state = newStateValue
+        let now = Date.now
+        newState.stateChangedHistory = (newState.stateChangedHistory + [now]).filter{$0.distance(to: .now) < 70}
+        return newState
+    }
+    
+    func onLinkStateUpdateTimer() {
         for link in domainModel.links {
-            onUpdateLinkState(link)
+            updateLinkStateFromSignalData(link)
         }
     }
-    func onUpdateLinkState(_ link: BluetoothLinkModel) {
+    
+    private func updateLinkStateFromSignalData(_ link: BluetoothLinkModel) {
         guard let linkState = runtimeModel.linkStates.first(where:{$0.id == link.id}) as? BluetoothLinkState
         else { return }
-        
+
         let now = Date.now
         let maxAgeSeconds: Double? = link.idleTimeout
+        let peripheral = runtimeModel.bluetoothStates.first{$0.id == link.deviceId && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)}
+
+        guard let newState = Self.calculateLinkStateFromSignalData(link, linkState, peripheral)
+        else { return }
+        
+//        logger.info("Link \(link.id) status; linked=\(newState.state);")
+        runtimeModel.linkStates.updateOrAppend(newState, where: {$0.id == link.id})
+        linkStateDidChange.send((data: link, oldState: linkState as LinkState, newState: newState as LinkState))
+    }
+    
+    static func calculateLinkStateFromSignalData(_ link: BluetoothLinkModel, _ linkState: BluetoothLinkState, _ peripheral: MonitoredPeripheral?) -> BluetoothLinkState? {
+        let now = Date.now
         
         var age: Double?
         var distance: Double?
-        let peripheral = runtimeModel.bluetoothStates.first{$0.id == link.deviceId && (maxAgeSeconds == nil || $0.lastSeenAt.distance(to: now) < maxAgeSeconds!)}
         if let peripheral = peripheral  {
             age = peripheral.lastSeenAt.distance(to: now)
             
@@ -89,11 +111,13 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
         }
         
         var linkActive = !(distance ?? 0 > link.maxDistance)
+        guard (linkState.stateChangedHistory.last?.distance(to: now)).map{$0 > link.linkStateDebounce} ?? true
+        else { return nil }
         
         if linkActive {
-            setLinked(link.id, true)
+            return Self.updatedLinkWithState(link.id, true, linkState)
         } else {
-            setLinked(link.id, false)
+            return Self.updatedLinkWithState(link.id, false, linkState)
         }
         
     }
@@ -216,7 +240,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
                 a.deviceId,
                 smoothing: (referenceRSSIAtOneMeter: a.referencePower, processNoise: a.processVariance, measureNoise: a.measureVariance))
             
-            let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, monitorData: monitor)
+            let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, stateChangedHistory: [], monitorData: monitor)
             runtimeModel.linkStates.append(linkState)
             
             if a.requireConnection {

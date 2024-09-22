@@ -246,7 +246,7 @@ class BluetoothMonitor: ObservableObject {
     
     static func updateMonitorData(monitorData: BluetoothMonitorData, update: MonitoredPeripheral) {
         func tail(_ arr: [DataSample]) -> [DataSample] {
-            return arr.filter{$0.date.distance(to: Date()) < 60}.suffix(1000)
+            return arr.filter{$0.date.distance(to: Date()) < signalDataRetentionPeriod}.suffix(1000)
         }
 
         let smoothingFunc = monitorData.smoothingFunc!
@@ -327,7 +327,7 @@ class BluetoothMonitor: ObservableObject {
     
     func onBluetoothScannerUpdate(_ update: MonitoredPeripheral) {
         func tail(_ arr: [Tuple2<Date, Double>]) -> [Tuple2<Date, Double>] {
-            return arr.filter{$0.a.distance(to: Date()) < 60}.suffix(1000)
+            return arr.filter{$0.a.distance(to: Date()) < signalDataRetentionPeriod}.suffix(1000)
         }
 
         for monitorData in monitors.filter{$0.deviceId == update.id}.map{$0.data} {
