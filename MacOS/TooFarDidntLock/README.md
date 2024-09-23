@@ -12,3 +12,7 @@ Configure various conditions under which your Mac should auto-lock:
 TF;DL runs as a MacOS MenuBar app.
 
 ![menubar menu](docs/menubar_menu.png)
+
+## Wifi
+Obtaining network SSID requires building with a real apple developer profile =/
+
