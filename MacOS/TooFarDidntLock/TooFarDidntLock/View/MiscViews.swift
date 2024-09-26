@@ -61,7 +61,6 @@ struct LabeledView<Content: View>: View {
 
     var body: some View {
         let info = Image(systemName: description != nil ? "info.circle" : "")
-            .frame(width: 0, height: 0)
             .onTapGesture {
                 descriptionShowing.toggle()
             }

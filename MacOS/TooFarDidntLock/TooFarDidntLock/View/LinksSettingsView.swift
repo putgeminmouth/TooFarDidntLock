@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LinksSettingsView: View {
     @EnvironmentObject var domainModel: DomainModel
+    @EnvironmentObject var advancedMode: EnvVar<Bool>
     
     @State var zoneIdFilter: UUID? = nil
     @State var modalIsPresented = false
@@ -69,7 +70,7 @@ struct LinksSettingsView: View {
                             }
                             modalIsPresented = false
                         })
-                            .frame(minWidth: 700)
+                        .frame(minWidth: advancedMode.value ? 900 : 400)
                             .padding()
                     }
             }

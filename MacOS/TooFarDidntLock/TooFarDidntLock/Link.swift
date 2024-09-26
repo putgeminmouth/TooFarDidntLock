@@ -238,7 +238,7 @@ class BluetoothLinkEvaluator: BaseLinkEvaluator {
             assert(!runtimeModel.linkStates.contains{$0.id == a.id})
             let monitor = bluetoothMonitor.startMonitoring(
                 a.deviceId,
-                smoothing: (referenceRSSIAtOneMeter: a.referencePower, processNoise: a.processVariance, measureNoise: a.measureVariance))
+                smoothing: (referenceRSSIAtOneMeter: a.referencePower, environmentalPathLoss: a.environmentalPathLoss, processNoise: a.processVariance, measureNoise: a.measureVariance))
             
             let linkState = BluetoothLinkState(id: a.id, state: Links.State.unlinked, stateChangedHistory: [], monitorData: monitor)
             runtimeModel.linkStates.append(linkState)

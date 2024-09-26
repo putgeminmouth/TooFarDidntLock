@@ -48,7 +48,7 @@ struct BluetoothSettingsView: View {
             if new != emptyID {
                 selectedMonitor = bluetoothMonitor.startMonitoring(
                     new,
-                    smoothing: (referenceRSSIAtOneMeter: state.lastSeenRSSI, processNoise: 0.1, measureNoise: 23.0)
+                    smoothing: (referenceRSSIAtOneMeter: state.lastSeenRSSI, environmentalPathLoss: PathLoss.lossy, processNoise: 0.1, measureNoise: 23.0)
                 )
             }
         }
@@ -197,6 +197,20 @@ struct BluetoothLinkSettingsView: View {
                                                  {$0?.zoneId},
                                                  {$0.value?.zoneId = $1!})
         let isNew = domainModel.links.first{$0.id == linkModel.id} == nil
+        
+        let requireConnectionView = HStack {
+            LabeledView(
+                label: "Require connection",
+                horizontal: true,
+                description: "This is more reliable but might drain your device's power and interfere with other uses.") {
+                    Toggle("", isOn: bindOpt($bluetoothLinkModel,
+                                             {$0?.requireConnection ?? false},
+                                             {$0.value!.requireConnection=$1}))
+                }
+            Spacer()
+            Image(systemName: (linkedDevice?.connectionState != .disconnected) ? "cable.connector" : "cable.connector.slash")
+                .colorMultiply(bluetoothLinkModel.value?.requireConnection == true ? .white : .gray)
+        }
 
         VStack(alignment: .leading) {
             HStack(alignment: .top) {
@@ -254,60 +268,75 @@ struct BluetoothLinkSettingsView: View {
                         }
                     }
                     if advancedMode.value {
-                        LabeledDoubleSlider(
-                            label: "Reference Power",
-                            description: "Set to the signal power at 1 meter.",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.referencePower ?? 0.0},
-                                           {$0.value!.referencePower=$1}),
-                            in: -100...0,
-                            format: {"\(Int($0))"})
-                        LabeledDoubleSlider(
-                            label: "Process variance",
-                            description: "TODO",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.processVariance ?? BluetoothLinkModel.DefaultProcessVariance},
-                                           {$0.value!.processVariance=$1}),
-                            in: 0.01...50,
-                            format: {"\(String(format: "%.2f", $0))"})
-                        HStack {
-                            Toggle(
-                                isOn: bindOpt($bluetoothLinkModel,
-                                              {$0?.autoMeasureVariance ?? advancedMode.value},
-                                              {$0.value!.autoMeasureVariance=$1}),
-                                label: {Image(systemName: "livephoto.badge.automatic")})
-                                .help("Auto tune")
+                        GroupBox("Distance estimation") {
                             LabeledDoubleSlider(
-                                label: "Measure variance",
+                                label: "Reference Power",
+                                description: "Set to the signal power at 1 meter.",
+                                value: bindOpt($bluetoothLinkModel,
+                                               {$0?.referencePower ?? 0.0},
+                                               {$0.value!.referencePower=$1}),
+                                in: -100...0,
+                                format: {"\(Int($0))"})
+                            LabeledDoubleSlider(
+                                label: "Path Loss",
+                                description: "Set to the signal power at 1 meter.",
+                                value: bindOpt($bluetoothLinkModel,
+                                               {$0?.environmentalPathLoss ?? 0.0},
+                                               {$0.value!.environmentalPathLoss=$1}),
+                                in: 1...50,
+                                format: {"\(Int($0))"})
+                        }
+                        GroupBox("Signal smoothing") {
+                            LabeledDoubleSlider(
+                                label: "Process variance",
                                 description: "TODO",
                                 value: bindOpt($bluetoothLinkModel,
-                                               {$0?.measureVariance ?? BluetoothLinkModel.DefaultMeasureVariance},
-                                               {$0.value!.measureVariance=$1}),
+                                               {$0?.processVariance ?? BluetoothLinkModel.DefaultProcessVariance},
+                                               {$0.value!.processVariance=$1}),
                                 in: 0.01...50,
                                 format: {"\(String(format: "%.2f", $0))"})
-                            .disabled(bluetoothLinkModel.value?.autoMeasureVariance ?? false)
+                            HStack {
+                                Toggle(
+                                    isOn: bindOpt($bluetoothLinkModel,
+                                                  {$0?.autoMeasureVariance ?? advancedMode.value},
+                                                  {$0.value!.autoMeasureVariance=$1}),
+                                    label: {Image(systemName: "livephoto.badge.automatic")})
+                                .help("Auto tune")
+                                LabeledDoubleSlider(
+                                    label: "Measure variance",
+                                    description: "TODO",
+                                    value: bindOpt($bluetoothLinkModel,
+                                                   {$0?.measureVariance ?? BluetoothLinkModel.DefaultMeasureVariance},
+                                                   {$0.value!.measureVariance=$1}),
+                                    in: 0.01...50,
+                                    format: {"\(String(format: "%.2f", $0))"})
+                                .disabled(bluetoothLinkModel.value?.autoMeasureVariance ?? false)
+                            }
                         }
-                        LabeledDoubleSlider(
-                            label: "Idle timeout",
-                            description: "Device is considered absent if not found for too long, resulting in a screen lock. Unless you configure an active connection, both the host and target device will scan / broadcast at intervals that may vary e.g. due to low power settings. It is recommended to set at least 10-30 seconds.",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.idleTimeout ?? 0.0},
-                                           {$0.value!.idleTimeout=$1}),
-                            in: 0...10*60, step: 10, format: {formatMinSec(msec: $0)})
-                        LabeledDoubleSlider(
-                            label: "Max distance",
-                            description: "The distance in meters at which the device is considered absent, resulting in a screen lock. It is calculated from the current signal strength and the reference power, and is not very stable or reliable.",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.maxDistance ?? 0.0},
-                                           {$0.value!.maxDistance=$1}),
-                            in: 0.0...9.0, step: 0.25, format: {"\(String(format: "%.2f", $0))m"})
-                        LabeledDoubleSlider(
-                            label: "Link state tolerance",
-                            description: "The min duration before the link will change states.",
-                            value: bindOpt($bluetoothLinkModel,
-                                           {$0?.linkStateDebounce ?? 0.0},
-                                           {$0.value!.linkStateDebounce=$1}),
-                            in: 0.0...90, step: nil, format: {formatMinSec(msec: $0)})
+                        GroupBox("Tolerance") {
+                            LabeledDoubleSlider(
+                                label: "Max distance",
+                                description: "The distance in meters at which the device is considered absent, resulting in a screen lock. It is calculated from the current signal strength and the reference power, and is not very stable or reliable.",
+                                value: bindOpt($bluetoothLinkModel,
+                                               {$0?.maxDistance ?? 0.0},
+                                               {$0.value!.maxDistance=$1}),
+                                in: 0.0...9.0, step: 0.25, format: {"\(String(format: "%.2f", $0))m"})
+                            LabeledDoubleSlider(
+                                label: "Scan timeout",
+                                description: "Device is considered absent if not found for too long, resulting in a screen lock. Unless you configure an active connection, both the host and target device will scan / broadcast at intervals that may vary e.g. due to low power settings. It is recommended to set at least 10-30 seconds.",
+                                value: bindOpt($bluetoothLinkModel,
+                                               {$0?.idleTimeout ?? 0.0},
+                                               {$0.value!.idleTimeout=$1}),
+                                in: 0...10*60, step: 10, format: {formatMinSec(msec: $0)})
+                            LabeledDoubleSlider(
+                                label: "Debounce",
+                                description: "The min duration before the link will change states.",
+                                value: bindOpt($bluetoothLinkModel,
+                                               {$0?.linkStateDebounce ?? 0.0},
+                                               {$0.value!.linkStateDebounce=$1}),
+                                in: 0.0...90, step: nil, format: {formatMinSec(msec: $0)})
+                            requireConnectionView
+                        }
                     } else {
                         Picker("Max distance",
                                selection: Binding<Distance>(get: {Distance.fromMeters(linkModel.maxDistance)},
@@ -315,19 +344,7 @@ struct BluetoothLinkSettingsView: View {
                             Text("Near \(String(format: "%.2f", Distance.near.toMeters()))m").tag(Distance.near)
                             Text("Far \(String(format: "%.2f", Distance.far.toMeters()))m").tag(Distance.far)
                         }
-                    }
-                    HStack {
-                        LabeledView(
-                            label: "Require connection",
-                            horizontal: true,
-                            description: "This is more reliable but might drain your device's power and interfere with other uses.") {
-                                Toggle("", isOn: bindOpt($bluetoothLinkModel,
-                                                         {$0?.requireConnection ?? false},
-                                                         {$0.value!.requireConnection=$1}))
-                            }
-                        Spacer()
-                        Image(systemName: (linkedDevice?.connectionState != .disconnected) ? "cable.connector" : "cable.connector.slash")
-                            .colorMultiply(bluetoothLinkModel.value?.requireConnection == true ? .white : .gray)
+                        requireConnectionView
                     }
                 }
                 
@@ -368,9 +385,12 @@ struct BluetoothLinkSettingsView: View {
         .onChange(of: bluetoothLinkModel.value?.referencePower ?? 0) { (old, new) in
             monitor?.data.referenceRSSIAtOneMeter = new
         }
-        .onChange(of: bluetoothLinkModel.value?.processVariance ?? 0) { (old, new) in
-            monitor?.data.smoothingFunc?.processVariance = new
+        .onChange(of: bluetoothLinkModel.value?.environmentalPathLoss ?? 0) { (old, new) in
+            monitor?.data.environmentalPathLoss = new
         }
+//        .onChange(of: bluetoothLinkModel.value?.processVariance ?? 0) { (old, new) in
+//            monitor?.data.smoothingFunc?.processVariance = new
+//        }
         .onChange(of: bluetoothLinkModel.value?.measureVariance ?? 0) { (old, new) in
             monitor?.data.smoothingFunc?.measureVariance = new
         }
@@ -420,7 +440,7 @@ struct BluetoothLinkSettingsView: View {
         let isNew = domainModel.links.first{$0.id == linkModel.id} == nil
         monitor = bluetoothMonitor.startMonitoring(
             linkModel.deviceId,
-            smoothing: (referenceRSSIAtOneMeter: linkModel.referencePower, processNoise: linkModel.processVariance, measureNoise: linkModel.measureVariance))
+            smoothing: (referenceRSSIAtOneMeter: linkModel.referencePower, environmentalPathLoss: linkModel.environmentalPathLoss, processNoise: linkModel.processVariance, measureNoise: linkModel.measureVariance))
 
         // just for the UX, backfill with existing data
         // if new, pick any available monitor for the device, but recalculate with current settings
@@ -539,6 +559,7 @@ struct EditBluetoothDeviceLinkModal: View {
                                     zoneId: zoneId,
                                     deviceId: selectedDevice.id,
                                     referencePower: selectedDevice.lastSeenRSSI,                                    
+                                    environmentalPathLoss: PathLoss.lossy,                                    
                                     processVariance: BluetoothLinkModel.DefaultProcessVariance,
                                     measureVariance: BluetoothLinkModel.DefaultMeasureVariance,
                                     autoMeasureVariance: advancedMode.value,

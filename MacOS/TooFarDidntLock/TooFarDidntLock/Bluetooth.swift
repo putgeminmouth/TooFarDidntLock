@@ -5,13 +5,6 @@ import CoreLocation
 import CoreBluetooth
 import OSLog
 
-func rssiDistance(referenceAtOneMeter: Double, current: Double) -> Double {
-    let N: Double = 2
-    let e: Double = (referenceAtOneMeter - current) / (10*N)
-    let distanceInMeters = pow(10, e)
-    return Double(distanceInMeters)
-}
-
 struct MonitoredPeripheral {
     enum ConnectionState {
         case connected
@@ -260,8 +253,9 @@ class BluetoothMonitor: ObservableObject {
         assert(monitorData.rssiSmoothedSamples.count < 2 || zip(monitorData.rssiSmoothedSamples, monitorData.rssiSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
         
         if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter,
-           var distanceSmoothedSamples = monitorData.distanceSmoothedSamples {
-            distanceSmoothedSamples = tail(distanceSmoothedSamples + [DataSample(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: rssiSmoothedSample))])
+           var distanceSmoothedSamples = monitorData.distanceSmoothedSamples,
+           let environmentalPathLoss = monitorData.environmentalPathLoss {
+            distanceSmoothedSamples = tail(distanceSmoothedSamples + [DataSample(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, environmentalPathLoss: environmentalPathLoss, current: rssiSmoothedSample))])
             assert(distanceSmoothedSamples.count < 2 || zip(distanceSmoothedSamples, distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
             monitorData.distanceSmoothedSamples = distanceSmoothedSamples
         }
@@ -272,8 +266,9 @@ class BluetoothMonitor: ObservableObject {
 
         monitorData.rssiSmoothedSamples = monitorData.rssiRawSamples.map{DataSample($0.date, smoothingFunc.update(measurement: $0.value))}
         
-        if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter {
-            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{DataSample($0.date, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: $0.value))}
+        if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter,
+           let environmentalPathLoss = monitorData.environmentalPathLoss {
+            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{DataSample($0.date, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, environmentalPathLoss: environmentalPathLoss, current: $0.value))}
         }
     }
     
@@ -288,12 +283,12 @@ class BluetoothMonitor: ObservableObject {
     
     func startMonitoring(
         _ id: UUID,
-        smoothing: (referenceRSSIAtOneMeter: Double, processNoise: Double, measureNoise: Double)? = nil) -> Monitored {
+        smoothing: (referenceRSSIAtOneMeter: Double, environmentalPathLoss: Double, processNoise: Double, measureNoise: Double)? = nil) -> Monitored {
             startMonitoring(id, smoothing: smoothing.map{s in {_ in s}})
         }
     func startMonitoring(
         _ id: UUID,
-        smoothing: ((BluetoothMonitorData) -> (referenceRSSIAtOneMeter: Double, processNoise: Double, measureNoise: Double))? = nil) -> Monitored {
+        smoothing: ((BluetoothMonitorData) -> (referenceRSSIAtOneMeter: Double, environmentalPathLoss: Double, processNoise: Double, measureNoise: Double))? = nil) -> Monitored {
             let data = BluetoothMonitorData()
             let monitorId = UUID()
             let monitor: Monitor = (
@@ -309,6 +304,7 @@ class BluetoothMonitor: ObservableObject {
                     processVariance: smoothing.processNoise,
                     measureVariance: smoothing.measureNoise)
                 monitor.data.referenceRSSIAtOneMeter = smoothing.referenceRSSIAtOneMeter
+                monitor.data.environmentalPathLoss = smoothing.environmentalPathLoss
             }
             let cancellable = AnyCancellable {
                 self.monitors.removeAll{$0.monitorId == monitorId}

@@ -164,7 +164,7 @@ class WifiMonitor: ObservableObject {
         
         if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter,
            var distanceSmoothedSamples = monitorData.distanceSmoothedSamples {
-            distanceSmoothedSamples = tail(distanceSmoothedSamples + [DataSample(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: rssiSmoothedSample))])
+            distanceSmoothedSamples = tail(distanceSmoothedSamples + [DataSample(update.lastSeenAt, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, environmentalPathLoss: PathLoss.lossy, current: rssiSmoothedSample))])
             assert(distanceSmoothedSamples.count < 2 || zip(distanceSmoothedSamples, distanceSmoothedSamples.dropFirst()).allSatisfy { current, next in current.date <= next.date })
             monitorData.distanceSmoothedSamples = distanceSmoothedSamples
         }
@@ -176,7 +176,7 @@ class WifiMonitor: ObservableObject {
         monitorData.rssiSmoothedSamples = monitorData.rssiRawSamples.map{DataSample($0.date, smoothingFunc.update(measurement: $0.value))}
         
         if let referenceRSSIAtOneMeter = monitorData.referenceRSSIAtOneMeter {
-            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{DataSample($0.date, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, current: $0.value))}
+            monitorData.distanceSmoothedSamples = monitorData.rssiSmoothedSamples.map{DataSample($0.date, rssiDistance(referenceAtOneMeter: referenceRSSIAtOneMeter, environmentalPathLoss: PathLoss.lossy, current: $0.value))}
         }
     }
     

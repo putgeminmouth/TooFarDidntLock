@@ -1,6 +1,25 @@
 import SwiftUI
 import Combine
 
+/*
+ https://en.wikipedia.org/wiki/Path_loss
+ > 2 is for propagation in free space, 4 is for relatively lossy environments
+ > and for the case of full specular reflection from the earth surface—the so-called flat earth model.
+ > In some environments, such as buildings, stadiums and other indoor environments,
+ > the path loss exponent can reach values in the range of 4 to 6
+ */
+struct PathLoss {
+    static let freeSpace = 2.0
+    static let lossy = 4.0
+}
+
+func rssiDistance(referenceAtOneMeter: Double, environmentalPathLoss: Double, current: Double) -> Double {
+    let N: Double = environmentalPathLoss
+    let e: Double = (referenceAtOneMeter - current) / (10*N)
+    let distanceInMeters = pow(10, e)
+    return Double(distanceInMeters)
+}
+
 // we keep a bit more than we show to allow smoothing the display edges
 // TODO: centralize this and the 60s used elsewhere
 let signalDataRetentionPeriod: TimeInterval = 100

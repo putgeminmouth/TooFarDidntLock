@@ -11,6 +11,7 @@ class BluetoothMonitorData: SignalMonitorData, ObservableObject {
     @Published var rssiSmoothedSamples = [DataSample]()
     
     @Published var referenceRSSIAtOneMeter: Double?
+    @Published var environmentalPathLoss: Double?
     @Published var distanceSmoothedSamples: [DataSample]?
 
     var smoothingFunc: KalmanFilter? = nil
@@ -36,6 +37,7 @@ struct BluetoothLinkModel: Link, Equatable {
     var zoneId: UUID
     var deviceId: UUID
     var referencePower: Double
+    var environmentalPathLoss: Double
     var processVariance: Double
     var measureVariance: Double
     var autoMeasureVariance: Bool
